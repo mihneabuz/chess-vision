@@ -5,7 +5,7 @@ from random import sample
 
 DATA = 'boards'
 
-def load_data(max=-1):
+def load_data(max=-1, gray=True):
     files = [file[:-4] for file in listdir(DATA) if file.endswith('.jpg')]
 
     if (max > 0):
@@ -13,6 +13,9 @@ def load_data(max=-1):
 
     images = [cv2.imread(DATA + '/' + file + '.jpg') for file in files]
     labels = [json.load(open(DATA + '/' + file + '.json')) for file in files]
+
+    if gray:
+        images = [cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) for image in images]
 
     return images, labels
 
