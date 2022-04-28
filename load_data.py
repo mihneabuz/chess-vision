@@ -25,6 +25,9 @@ def get_corners(labels):
 def get_pieces(labels):
     return [label['config'] for label in labels]
 
+def get_cells():
+    return json.load(open(DATA + '/config.json'))['cellsCoordinates']
+
 if __name__ == "__main__":
     images, labels = load_data(1)
     corners = get_corners(labels)
@@ -32,3 +35,4 @@ if __name__ == "__main__":
     print(images[0].shape)
     print(corners[0])
     print(pieces[0])
+    print(get_cells())

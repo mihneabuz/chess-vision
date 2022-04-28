@@ -1,6 +1,7 @@
 import numpy as np
 from cv2 import cv2
 import matplotlib.pyplot as plt
+from load_data import get_cells
 
 IMAGE_GROWTH_FACTOR = 0.1
 IMAGE_SIZE = 128
@@ -31,6 +32,9 @@ def getSegmentsIntersection(a1, a2, b1, b2):
     return aPoint if (np.linalg.norm(np.round(aPoint - bPoint), 5) == 0.0) else None
 
 # TODO: study and cleanup this function
+boardSize = np.array([8, 8])
+boardImgSize = np.ceil((boardSize * IMAGE_SIZE)/(1.0 + IMAGE_GROWTH_FACTOR * (boardSize - 1.0))).astype(int)
+boardImgSize = tuple(boardImgSize)
 def unprojectCropFromRelativeCoords(img_, cx, outputShape, growthFactor = 0.0):
     boardCornersRel = np.array(cx)
     boardCornersRel = np.column_stack((boardCornersRel[:,0], 1.0 - boardCornersRel[:,1]))
@@ -54,22 +58,56 @@ def unprojectCropFromRelativeCoords(img_, cx, outputShape, growthFactor = 0.0):
 
     return cv2.warpPerspective(img_, M, outputShape, flags=cv2.INTER_LINEAR)
 
-def crop_image(image, corners):
-    boardSize = np.array([8, 8])
-    boardImgSize = np.ceil((boardSize * IMAGE_SIZE)/(1.0 + IMAGE_GROWTH_FACTOR * (boardSize - 1.0))).astype(int)
-    boardImgSize = tuple(boardImgSize)
-    
+def crop_board(image, corners):
     return unprojectCropFromRelativeCoords(image, corners, boardImgSize, IMAGE_GROWTH_FACTOR)
 
-if __name__ == "__main__":
-    from load_data import load_data, get_corners 
-    images, labels = load_data(1)
-    corners = get_corners(labels)
-    image = images[0]
-    corns = corners[0]
 
-    board_image = crop_image(image, corns)
+# TODO: study and cleanup these functions
+marginsSize = np.array([1.0, 1.0]) * IMAGE_SIZE * IMAGE_GROWTH_FACTOR * 0.5
+cellSize = (IMAGE_SIZE - 2.0 * marginsSize) / boardSize
+cellRelSize = (1.0 - IMAGE_GROWTH_FACTOR) / boardSize
+def getCellCenterRel(cellX, cellY):
+    return np.zeros(2) + (IMAGE_GROWTH_FACTOR * 0.5) + np.array([0.5 + cellX, 0.5 + cellY]) * cellRelSize
+
+def getCellBoundingBoxRel(cellX, cellY):
+    cellCenter = getCellCenterRel(cellX, cellY)
+    newExtents = np.dot(np.array([-0.5, 0.5]).reshape((2,1)), (cellRelSize + IMAGE_GROWTH_FACTOR).reshape((1,2)))
+    return cellCenter + newExtents
+
+def crop_pieces(image, pieces):
+    images = []
+    labels = []
+
+    cells = get_cells()
+    for cell in cells:
+        cell_coords = cells[cell]
+        cellBoundsRel = getCellBoundingBoxRel(cell_coords[0], cell_coords[1])
+        cellBoundsAbs = np.round(np.multiply(cellBoundsRel.T, boardImgSize)).astype(int)
+        
+        piece_image = image[cellBoundsAbs[0,0]:cellBoundsAbs[0,1],cellBoundsAbs[1,0]:cellBoundsAbs[1,1]]
+
+        images.append(piece_image)
+        labels.append(pieces.get(cell, 'empty'))
+
+    return images, labels
+
+if __name__ == "__main__":
+    from load_data import load_data, get_corners, get_pieces
+    images, labels = load_data(1)
+    corners = get_corners(labels)[0]
+    pieces = get_pieces(labels)[0]
+
+    board_image = crop_board(images[0], corners)
+    piece_images, cell_labels = crop_pieces(board_image, pieces)
+
+    print(len(piece_images))
+    print(len(cell_labels))
 
     plt.imshow(board_image, cmap='gray')
     plt.show()
+
+    for i in range(len(piece_images)):
+        print(cell_labels[i])
+        plt.imshow(piece_images[i], cmap='gray')
+        plt.show()
 
