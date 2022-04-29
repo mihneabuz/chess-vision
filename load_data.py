@@ -2,6 +2,7 @@ from cv2 import cv2
 import json
 from os import listdir
 from random import sample
+from tqdm import tqdm
 
 DATA = 'boards'
 
@@ -11,7 +12,7 @@ def load_data(max=-1, gray=True):
     if (max > 0):
         files = sample(files, max)
 
-    images = [cv2.imread(DATA + '/' + file + '.jpg') for file in files]
+    images = [cv2.imread(DATA + '/' + file + '.jpg') for file in tqdm(files, desc="loading images")]
     labels = [json.load(open(DATA + '/' + file + '.json')) for file in files]
 
     if gray:

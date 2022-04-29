@@ -1,7 +1,8 @@
 import numpy as np
 from cv2 import cv2
 import matplotlib.pyplot as plt
-from load_data import get_cells
+from load_data import load_data, get_corners, get_pieces, get_cells
+from tqdm import tqdm, trange
 
 IMAGE_GROWTH_FACTOR = 0.1
 IMAGE_SIZE = 128
@@ -61,6 +62,8 @@ def unprojectCropFromRelativeCoords(img_, cx, outputShape, growthFactor = 0.0):
 def crop_board(image, corners):
     return unprojectCropFromRelativeCoords(image, corners, boardImgSize, IMAGE_GROWTH_FACTOR)
 
+def batch_crop_board(images, corners):
+    return [crop_board(images[i], corners[i]) for i in trange(len(images), desc="croping boards")]
 
 # TODO: study and cleanup these functions
 marginsSize = np.array([1.0, 1.0]) * IMAGE_SIZE * IMAGE_GROWTH_FACTOR * 0.5
@@ -74,7 +77,7 @@ def getCellBoundingBoxRel(cellX, cellY):
     newExtents = np.dot(np.array([-0.5, 0.5]).reshape((2,1)), (cellRelSize + IMAGE_GROWTH_FACTOR).reshape((1,2)))
     return cellCenter + newExtents
 
-def crop_pieces(image, pieces):
+def crop_pieces(image, pieces=None):
     images = []
     labels = []
 
@@ -87,12 +90,20 @@ def crop_pieces(image, pieces):
         piece_image = image[cellBoundsAbs[0,0]:cellBoundsAbs[0,1],cellBoundsAbs[1,0]:cellBoundsAbs[1,1]]
 
         images.append(piece_image)
-        labels.append(pieces.get(cell, 'empty'))
+        if pieces:
+            labels.append(pieces.get(cell, 'empty'))
 
     return images, labels
 
+def batch_crop_pieces(images, pieces=None):
+    piece_images, piece_labels = [], []
+    for results in [crop_pieces(images[i], pieces=pieces[i] if pieces else None) for i in trange(len(images), desc="croping pieces")]:
+        piece_images += results[0]
+        piece_labels += results[1]
+
+    return piece_images, piece_labels
+
 if __name__ == "__main__":
-    from load_data import load_data, get_corners, get_pieces
     images, labels = load_data(1)
     corners = get_corners(labels)[0]
     pieces = get_pieces(labels)[0]
