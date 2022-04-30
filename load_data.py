@@ -1,12 +1,22 @@
 from cv2 import cv2
 import json
-from os import listdir
+from os import listdir, path
 from random import sample
 from tqdm import tqdm
 
-DATA = 'boards'
+DATA = 'boards/data'
+
+def download_data():
+    print('downloading dataset...', end='', flush=True)
+    import kaggle
+    kaggle.api.authenticate()
+    kaggle.api.dataset_download_files('thefamousrat/synthetic-chess-board-images', path='boards', unzip=True)
+    print('done')
 
 def load_data(max=-1, gray=True):
+    if not path.isdir(DATA):
+        download_data()
+
     files = [file[:-4] for file in listdir(DATA) if file.endswith('.jpg')]
 
     if (max > 0):
@@ -30,7 +40,7 @@ def get_cells():
     return json.load(open(DATA + '/config.json'))['cellsCoordinates']
 
 if __name__ == "__main__":
-    images, labels = load_data(1)
+    images, labels = load_data(100)
     corners = get_corners(labels)
     pieces = get_pieces(labels)
     print(images[0].shape)
