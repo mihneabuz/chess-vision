@@ -41,6 +41,34 @@ classes_dict = {
 
 num_classes = len(classes_dict)
 
+def load_datasets():
+    images, labels = load_data(max=20, gray=False)
+    corners = get_corners(labels)
+    pieces = get_pieces(labels)
+
+    board_images = batch_crop_board(images, corners)
+    pieces_images, pieces_labels = batch_crop_pieces(board_images, pieces)
+
+    image_size = pieces_images[0].shape
+    counts = Counter(pieces_labels)
+    pieces_classes = [classes_dict[label] for label in pieces_labels]
+
+    print(f'image size: {image_size}')
+    print(f'label distribution: {", ".join([x[0] + ": " + str(x[1]) for x in counts.items()])}')
+
+    plt.bar(counts.keys(), counts.values())
+    plt.show()
+
+    # TODO: fix label distribution -> remove some empty cell pictures
+
+    data = PieceDataset(pieces_images, pieces_classes) 
+    size = len(data)
+    train_size = int(size * 0.7)
+    valid_size = size - train_size
+
+    train_ds, valid_ds = random_split(data, [train_size, valid_size], generator=GENERATOR)
+    return train_ds, valid_ds
+
 def train_loop(model, dataloader, optimizer, criterion):
     model.train()
 
@@ -59,35 +87,13 @@ def train_loop(model, dataloader, optimizer, criterion):
     return total_loss.item()
 
 def train():
-    images, labels = load_data(max=20, gray=False)
-    corners = get_corners(labels)
-    pieces = get_pieces(labels)
+    train_ds, valid_ds = load_datasets()
+    train_dl = DataLoader(train_ds, batch_size=64, shuffle=True, num_workers=2)
 
-    board_images = batch_crop_board(images, corners)
-    pieces_images, pieces_labels = batch_crop_pieces(board_images, pieces)
-
-    image_size = pieces_images[0].shape
-    counts = Counter(pieces_labels)
-    pieces_classes = [classes_dict[label] for label in pieces_labels]
-
-    data = PieceDataset(pieces_images, pieces_classes) 
-    size = len(data)
-    train_size = int(size * 0.7)
-    valid_size = size - train_size
-
-    train_ds, valid_ds = random_split(data, [train_size, valid_size], generator=GENERATOR)
-    train_dl = DataLoader(train_ds, batch_size=64, shuffle=True, num_workers=1)
-
-    print(f'image size: {image_size}')
-    print(f'label distribution: {", ".join([x[0] + ": " + str(x[1]) for x in counts.items()])}')
-
-    plt.bar(counts.keys(), counts.values())
-    plt.show()
-
-    model = models.efficientnet_b0(pretrained=True)
+    model = models.efficientnet_b2(pretrained=True)
     last_layer_size = model.classifier[-1].__getattribute__('out_features')
     model.classifier.append(nn.Linear(in_features=last_layer_size, out_features=num_classes))
-    summary(model, input_size=(image_size[2], image_size[0], image_size[1]))
+    summary(model, input_size=(3, 1280, 1280))
 
     epochs = 4
     lr = 0.001
