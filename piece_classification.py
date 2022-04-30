@@ -16,7 +16,7 @@ class PieceDataset(Dataset):
     def __init__(self, images, labels):
         device = get_device()
         self.images = [torch.tensor(image.transpose(2, 0, 1)).to(device) / 255 for image in images]
-        self.labels = labels
+        self.labels = [torch.tensor(label).to(device) for label in labels]
 
     def __len__(self):
         return len(self.images)
