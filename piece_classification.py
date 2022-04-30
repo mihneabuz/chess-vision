@@ -14,7 +14,8 @@ GENERATOR = torch.Generator().manual_seed(42)
 
 class PieceDataset(Dataset):
     def __init__(self, images, labels):
-        self.images = [torch.tensor(image.transpose(2, 0, 1)) / 255 for image in images]
+        device = get_device()
+        self.images = [torch.tensor(image.transpose(2, 0, 1)).to(device) / 255 for image in images]
         self.labels = labels
 
     def __len__(self):
@@ -40,6 +41,9 @@ classes_dict = {
 }
 
 num_classes = len(classes_dict)
+
+def get_device():
+    return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def load_datasets(limit=-1):
     images, labels = load_data(max=limit, gray=False)
@@ -87,13 +91,16 @@ def train_loop(model, dataloader, optimizer, criterion):
     return total_loss.item()
 
 def train():
-    train_ds, valid_ds = load_datasets()
+    train_ds, valid_ds = load_datasets(10)
     train_dl = DataLoader(train_ds, batch_size=64, shuffle=True, num_workers=2)
 
     model = models.efficientnet_b2(pretrained=True)
     last_layer_size = model.classifier[-1].__getattribute__('out_features')
     model.classifier.append(nn.Linear(in_features=last_layer_size, out_features=num_classes))
     summary(model, input_size=(3, 1280, 1280))
+
+    device = get_device()
+    model.to(device)
 
     epochs = 4
     lr = 0.001
