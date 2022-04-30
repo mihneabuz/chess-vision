@@ -41,8 +41,8 @@ classes_dict = {
 
 num_classes = len(classes_dict)
 
-def load_datasets():
-    images, labels = load_data(max=20, gray=False)
+def load_datasets(limit=-1):
+    images, labels = load_data(max=limit, gray=False)
     corners = get_corners(labels)
     pieces = get_pieces(labels)
 
