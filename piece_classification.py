@@ -127,8 +127,8 @@ def validation_metrics(model, dataloader):
     for data in tqdm(dataloader, desc='accuracy metrics'):
         images, labels = data
 
-        preds = np.concatenate((preds, torch.argmax(model(images), dim=1).numpy()))
-        real = np.concatenate((real, labels.numpy()))
+        preds = np.concatenate((preds, torch.argmax(model(images), dim=1).cpu().numpy()))
+        real = np.concatenate((real, labels.cpu().numpy()))
 
     accuracy = accuracy_score(real, preds),
     f1 = f1_score(real, preds, labels=range(num_classes), average='macro'),
@@ -139,10 +139,10 @@ def validation_metrics(model, dataloader):
     return accuracy[0], f1[0], precision[0], recall
            
 
-def train():
-    train_ds, valid_ds = load_datasets(10)
+def train(epochs):
+    train_ds, valid_ds = load_datasets()
     train_dl = DataLoader(train_ds, batch_size=64, shuffle=True)
-    valid_dl = DataLoader(valid_ds, batch_size=2)
+    valid_dl = DataLoader(valid_ds, batch_size=64)
 
     model = models.efficientnet_b2(pretrained=True)
     last_layer_size = model.classifier[-1].__getattribute__('out_features')
@@ -152,8 +152,7 @@ def train():
     device = get_device()
     model.to(device)
 
-    epochs = 2
-    lr = 0.001
+    lr = 0.0004
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
@@ -169,11 +168,11 @@ def train():
     plt.show()
 
     accuracy, f1, precision, recall = validation_metrics(model, valid_dl)
-    print(f'accuracy: {accuracy}\nf1 score: {f1}')
+    print(f'accuracy: {accuracy:.4f}\nf1 score: {f1:.4f}')
 
     print('precision / recall')
     for i, label in enumerate(classes_dict.keys()):
         print(f'{label:10} {precision[i]:.2f} {recall[i]:.2f}')
 
 if __name__ == "__main__":
-    train()
+    train(2)
