@@ -4,6 +4,8 @@ from os import listdir, path
 from random import sample
 from tqdm import tqdm
 
+from process import crop_board, crop_pieces
+
 DATA = 'boards/data'
 
 def download_data():
@@ -13,7 +15,7 @@ def download_data():
     kaggle.api.dataset_download_files('thefamousrat/synthetic-chess-board-images', path='boards', unzip=True)
     print('done')
 
-def load_data(max=-1, gray=True):
+def load_data(max=-1):
     if not path.isdir(DATA):
         download_data()
 
@@ -22,28 +24,31 @@ def load_data(max=-1, gray=True):
     if (max > 0):
         files = sample(files, max)
 
-    images = [cv2.imread(DATA + '/' + file + '.jpg') for file in tqdm(files, desc="loading images")]
-    labels = [json.load(open(DATA + '/' + file + '.json')) for file in files]
+    for file in tqdm(files, desc='loading images'):
+        image = cv2.imread(DATA + '/' + file + '.jpg')
+        annotations = json.load(open(DATA + '/' + file + '.json'))
+        yield image, annotations
 
-    if gray:
-        images = [cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) for image in images]
+def load_board_images(max=-1):
+    for image, annotations in load_data(max=max):
+        yield image, annotations['corners']
 
-    return images, labels
-
-def get_corners(labels):
-    return [label['corners'] for label in labels]
-
-def get_pieces(labels):
-    return [label['config'] for label in labels]
-
-def get_cells():
-    return json.load(open(DATA + '/config.json'))['cellsCoordinates']
+def load_piece_images(max=-1):
+    for image, annotations in load_data(max=max):
+        board_image = crop_board(image, annotations['corners'])
+        pieces, labels = crop_pieces(board_image, annotations['config'])
+        yield from zip(pieces, labels)
 
 if __name__ == "__main__":
-    images, labels = load_data(100)
-    corners = get_corners(labels)
-    pieces = get_pieces(labels)
-    print(images[0].shape)
-    print(corners[0])
-    print(pieces[0])
-    print(get_cells())
+    for image, labels in load_data(1):
+        print(image.shape)
+        print(labels)
+
+    for image, labels in load_board_images(1):
+        print(image.shape)
+        print(labels)
+
+    for piece, label in load_piece_images(1):
+        print(piece.shape)
+        print(label)
+        break

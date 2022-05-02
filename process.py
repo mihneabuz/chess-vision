@@ -1,126 +1,117 @@
 import numpy as np
+from cv2 import cv2
 import matplotlib.pyplot as plt
-from cv2 import cv2 
-from sklearn.cluster import KMeans
-from random import randint
+from tqdm import trange
 
-R = (0, 0, 255)
-B = (255, 0, 0)
-G = (0, 255, 0)
+from utils import cells
 
-attemps = 8
-debug = False
-corners = [1, 2, 65, 66]
+IMAGE_GROWTH_FACTOR = 0.1
+IMAGE_SIZE = 128
 
-def show_img(im):
-    plt.imshow(im[:,:,::-1])
-    plt.show()
+# TODO: study and cleanup this function
+def getSegmentsIntersection(a1, a2, b1, b2):
+    a = a2 - a1
+    b = b2 - b1
+    o = a1 - b1
+    aLenSq = np.dot(a, a)
+    aDotB = np.dot(a, b)
+    denom = (aLenSq * np.dot(b, b)) - aDotB**2.0
 
-def process_kmeans(im):
-    gray = cv2.cvtColor(im, cv2.COLOR_RGB2GRAY)
+    if denom == 0.0:
+        # The segment are parallel, no unique intersection exists
+        return None
 
-    corners = cv2.goodFeaturesToTrack(gray, 150, 0.1, 30)
-    points = corners[:, 0, :].astype(np.uint32)
+    u = ((aLenSq * np.dot(b, o)) - (aDotB * np.dot(a, o))) / denom
 
-    model = KMeans(n_clusters=64).fit(points)
-    colors = [(randint(0, 256), randint(0, 256), randint(0, 256)) for _ in range(64)]
-    for point, cluster in zip(points, model.predict(points)):
-        print(point, cluster, colors[cluster])
-        cv2.circle(im, point, 6, colors[cluster], -1)
+    if u < 0.0 or u > 1.0:
+        # The potential intersection point is not situated on the segment, aborting
+        return None
 
-    show_img(im)
-    return gray
+    t = np.dot(a, u * b - o) / aLenSq
+    aPoint = a1 + t * a
+    bPoint = b1 + u * b
 
-def closest_man(point, points):
-    dist = 10000
-    for x in points:
-        d = abs(x[0] - point[0]) + abs(x[1] - point[1])
-        if d < dist:
-            dist = d
+    return aPoint if (np.linalg.norm(np.round(aPoint - bPoint), 5) == 0.0) else None
 
-    return dist
+# TODO: study and cleanup this function
+boardSize = np.array([8, 8])
+boardImgSize = np.ceil((boardSize * IMAGE_SIZE)/(1.0 + IMAGE_GROWTH_FACTOR * (boardSize - 1.0))).astype(int)
+boardImgSize = tuple(boardImgSize)
+def unprojectCropFromRelativeCoords(img_, cx, outputShape, growthFactor = 0.0):
+    boardCornersRel = np.array(cx)
+    boardCornersRel = np.column_stack((boardCornersRel[:,0], 1.0 - boardCornersRel[:,1]))
 
-def grid_cost(grid, points):
-    cost = 0
-    for point in grid:
-        cost += closest_man(point, points)
+    O = getSegmentsIntersection(boardCornersRel[0], boardCornersRel[3], boardCornersRel[1], boardCornersRel[2])
+    for i in range(4):
+        boardCornersRel[i] = growthFactor * (boardCornersRel[i] - O) + boardCornersRel[i]
 
-    return cost
+    cornersAbs = np.round(boardCornersRel * (np.array(img_.shape)[0:2] - np.array([1.0, 1.0])))
 
-def gen_grid(start, diff):
-    points = [start]
-    rdiff = np.array([-diff[1], diff[0]])
+    outCoords = np.array([
+        [outputShape[0]-1, 0.0],
+        [outputShape[0]-1, outputShape[1]-1],
+        [0.0, 0.0],
+        [0.0, outputShape[1]-1],
+    ])
 
-    for i in range(-4, 5):
-        if (i != 0):
-            points.append(start + i * diff + i * rdiff)
-            points.append(start + i * diff - i * rdiff)
-        for j in range(-abs(i) + 1, abs(i)):
-            points.append(start + i * diff + j * rdiff)
-            points.append(start + i * rdiff + j * diff)
+    inCoords = np.float32(cornersAbs)
+    outCoords = np.float32(outCoords)
+    M = cv2.getPerspectiveTransform(inCoords, outCoords)
 
-    return points
+    return cv2.warpPerspective(img_, M, outputShape, flags=cv2.INTER_LINEAR)
 
-def process(im):
-    gray = cv2.cvtColor(im, cv2.COLOR_RGB2GRAY)
+def crop_board(image, corners):
+    return unprojectCropFromRelativeCoords(image, corners, boardImgSize, IMAGE_GROWTH_FACTOR)
 
-    h, w = gray.shape
-    mid = (h // 2, w // 2)
-    features = cv2.goodFeaturesToTrack(gray, 110, 0.01, 30)
-    points = sorted(features[:, 0, :].astype(np.int32), key=lambda p: (p[0] - mid[0]) ** 2 + (p[1] - mid[1]) ** 2)
+# TODO: study and cleanup these functions
+marginsSize = np.array([1.0, 1.0]) * IMAGE_SIZE * IMAGE_GROWTH_FACTOR * 0.5
+cellSize = (IMAGE_SIZE - 2.0 * marginsSize) / boardSize
+cellRelSize = (1.0 - IMAGE_GROWTH_FACTOR) / boardSize
+def getCellCenterRel(cellX, cellY):
+    return np.zeros(2) + (IMAGE_GROWTH_FACTOR * 0.5) + np.array([0.5 + cellX, 0.5 + cellY]) * cellRelSize
 
-    best_grid, best_cost = [], 1000000
-    for i in range(attemps):
-        start = points[i]
+def getCellBoundingBoxRel(cellX, cellY):
+    cellCenter = getCellCenterRel(cellX, cellY)
+    newExtents = np.dot(np.array([-0.5, 0.5]).reshape((2,1)), (cellRelSize + IMAGE_GROWTH_FACTOR).reshape((1,2)))
+    return cellCenter + newExtents
 
-        for neigh in points[:attemps]:
-            if neigh is not start:
-                diff = neigh - start
+def crop_pieces(image, pieces=None):
+    images = []
+    labels = []
 
-                if abs(diff[0]) + abs(diff[1]) < 60:
-                    continue
+    for cell in cells:
+        cell_coords = cells[cell]
+        cellBoundsRel = getCellBoundingBoxRel(cell_coords[0], cell_coords[1])
+        cellBoundsAbs = np.round(np.multiply(cellBoundsRel.T, boardImgSize)).astype(int)
+        
+        piece_image = image[cellBoundsAbs[0,0]:cellBoundsAbs[0,1],cellBoundsAbs[1,0]:cellBoundsAbs[1,1]]
 
-                if debug:
-                    cv2.circle(im, neigh, 6, G, -1)
-                    show_img(im)
-                    cv2.circle(im, neigh, 6, R, -1)
+        images.append(piece_image)
+        if pieces:
+            labels.append(pieces.get(cell, 'empty'))
 
-                grid = gen_grid(start, diff)
-                cost = grid_cost(grid, points)
+    image = None
+    return images, labels
 
-                if (cost < best_cost):
-                    best_cost = cost
-                    best_grid = grid
+if __name__ == "__main__":
+    from load_data import load_data
+    
+    for image, annotations in load_data(1):
+        corners = annotations['corners']
+        pieces = annotations['config']
 
-                if debug:
-                    copy = np.copy(im)
-                    for point in grid:
-                        cv2.circle(copy, point, 6, B, -1)
-                    show_img(copy)
-                    for point in grid:
-                        cv2.circle(copy, point, 6, R, -1)
+        board_image = crop_board(image, corners)
+        piece_images, cell_labels = crop_pieces(board_image, pieces)
 
-    print(best_cost)
+        print(len(piece_images))
+        print(len(cell_labels))
 
-    for point in points:
-        cv2.circle(im, point, 6, R, -1)
+        plt.imshow(board_image)
+        plt.show()
 
-    for point in best_grid:
-        cv2.circle(im, point, 6, G, -1)
+        for i in range(len(piece_images)):
+            print(cell_labels[i])
+            plt.imshow(piece_images[i])
+            plt.show()
+            break
 
-    for corner in corners:
-        cv2.circle(im, best_grid[corner], 7, B, -1)
-
-    show_img(im)
-
-    return gray
-
-
-def test():
-    plt.rcParams["figure.figsize"] = (9,9)
-    im = cv2.imread('boards/1010.jpg')
-    # process(im)
-    process(im)
-
-if __name__ == '__main__':
-    test()
