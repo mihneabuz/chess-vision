@@ -68,6 +68,8 @@ def load_datasets(limit=-1, balance=True):
     return random_split(dataset(pieces_images, pieces_classes), [train_size, valid_size], generator=GEN)
 
 def train(epochs, batch_size=64, limit=-1):
+    device = get_device()
+
     train_ds, valid_ds = load_datasets(limit=limit)
     train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     valid_dl = DataLoader(valid_ds, batch_size=batch_size)
@@ -75,10 +77,8 @@ def train(epochs, batch_size=64, limit=-1):
     model = models.efficientnet_b2(pretrained=True)
     last_layer_size = model.classifier[-1].__getattribute__('out_features')
     model.classifier.append(torch.nn.Linear(in_features=last_layer_size, out_features=num_classes))
-    summary(model, (3, 128, 128))
-
-    device = get_device()
     model.to(device)
+    summary(model, (3, 128, 128))
 
     lr = 0.0001
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
