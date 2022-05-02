@@ -1,4 +1,9 @@
+import numpy as np
 import torch
+import torchsummary
+from torch.utils.data import Dataset
+from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
+from tqdm import tqdm
 
 cells = {
     "A1": [0, 0], "A2": [0, 1], "A3": [0, 2], "A4": [0, 3], "A5": [0, 4], "A6": [0, 5], "A7": [0, 6], "A8": [0, 7],
@@ -31,3 +36,65 @@ num_classes = len(classes_dict)
 
 def get_device():
     return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+def summary(model, input):
+    torchsummary.summary(model, input_size=input, device='cuda' if torch.cuda.is_available() else 'cpu')
+
+def train_loop(model, dataloader, optimizer, criterion, transform=lambda x: x):
+    device = get_device()
+    model.train()
+
+    losses = []
+    for images, labels in tqdm(dataloader, desc='batches'):
+        images = transform(images.to(device))
+        labels = labels.to(device)
+
+        optimizer.zero_grad()
+        pred = model(images)
+        loss = criterion(pred, labels)
+
+        losses.append(loss.item())
+
+        loss.backward()
+        optimizer.step()
+
+    return losses
+
+def validation_metrics(model, dataloader, transform, results):
+    device = get_device()
+
+    with torch.no_grad():
+        preds = np.array([])
+        real = np.array([])
+
+        for images, labels in tqdm(dataloader, desc='accuracy metrics'):
+            images = transform(images.to(device))
+            labels = labels.to(device)
+
+            preds = np.concatenate((preds, results(model(images)).cpu().numpy()))
+            real = np.concatenate((real, labels.cpu().numpy()))
+
+        accuracy = accuracy_score(real, preds),
+        f1 = f1_score(real, preds, labels=range(num_classes), average='macro'),
+
+        precision = precision_score(real, preds, labels=range(num_classes), average=None),
+        recall = recall_score(real, preds, labels=range(num_classes), average=None)
+
+    return accuracy[0], f1[0], precision[0], recall
+           
+
+
+class SimpleDataset(Dataset):
+    def __init__(self, x, y):
+        self.data = list(zip(x, y))
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+def dataset(x, y):
+    return SimpleDataset(x, y)
+
+
