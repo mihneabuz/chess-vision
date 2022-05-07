@@ -42,7 +42,7 @@ def summary(model, input):
 
 def train_loop(model, dataloader, optimizer, criterion, transform=lambda x: x):
     device = get_device()
-    model.train()
+    model.train(True)
 
     losses = []
     for images, labels in tqdm(dataloader, desc='batches'):
@@ -62,12 +62,13 @@ def train_loop(model, dataloader, optimizer, criterion, transform=lambda x: x):
 
 def validation_metrics(model, dataloader, transform, results):
     device = get_device()
+    model.train(False)
 
     with torch.no_grad():
         preds = np.array([])
         real = np.array([])
 
-        for images, labels in tqdm(dataloader, desc='accuracy metrics'):
+        for images, labels in tqdm(dataloader, desc='metrics'):
             images = transform(images.to(device))
             labels = labels.to(device)
 
@@ -81,7 +82,6 @@ def validation_metrics(model, dataloader, transform, results):
         recall = recall_score(real, preds, labels=range(num_classes), average=None)
 
     return accuracy[0], f1[0], precision[0], recall
-           
 
 
 class SimpleDataset(Dataset):
