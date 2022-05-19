@@ -1,3 +1,4 @@
 data
 boards
 .DS_Store
+__pycache__
