@@ -47,7 +47,7 @@ def loss_func(predicted, real):
     grouped = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
     return (grouped - real).pow(2).sum(2).sqrt().sum()
 
-def train(epochs, lr=0.00004, batch_size=4, limit=-1, load_dict=False):
+def train(epochs, lr=0.0005, batch_size=4, limit=-1, load_dict=False):
     device = get_device()
 
     train_ds, valid_ds = load_datasets(limit=limit)
@@ -94,7 +94,7 @@ def train(epochs, lr=0.00004, batch_size=4, limit=-1, load_dict=False):
     i = 0
     model.eval()
     for image, corners in valid_ds:
-        preds = model(jit_transform(image)[None, :, :, :])
+        preds = model(jit_transform(image)[None, :, :, :].to(device))
         im = image.numpy().transpose(1, 2, 0)
 
         cv2.circle(im, [int(corners[0][1] * 640), int(corners[0][0] * 640)], 10, (0, 0, 255), 4)
@@ -102,10 +102,10 @@ def train(epochs, lr=0.00004, batch_size=4, limit=-1, load_dict=False):
         cv2.circle(im, [int(corners[2][1] * 640), int(corners[2][0] * 640)], 10, (0, 255, 255), 4)
         cv2.circle(im, [int(corners[3][1] * 640), int(corners[3][0] * 640)], 10, (0, 255, 0), 4)
 
-        cv2.circle(im, [int(preds[0][0] * 640), int(preds[0][1] * 640)], 15, (0, 0, 155), 4)
-        cv2.circle(im, [int(preds[0][2] * 640), int(preds[0][3] * 640)], 15, (155, 0, 0), 4)
-        cv2.circle(im, [int(preds[0][4] * 640), int(preds[0][5] * 640)], 15, (0, 155, 155), 4)
-        cv2.circle(im, [int(preds[0][6] * 640), int(preds[0][7] * 640)], 15, (0, 155, 0), 4)
+        cv2.circle(im, [int(preds[0][1] * 640), int(preds[0][0] * 640)], 15, (0, 0, 155), 4)
+        cv2.circle(im, [int(preds[0][3] * 640), int(preds[0][2] * 640)], 15, (155, 0, 0), 4)
+        cv2.circle(im, [int(preds[0][5] * 640), int(preds[0][4] * 640)], 15, (0, 155, 155), 4)
+        cv2.circle(im, [int(preds[0][7] * 640), int(preds[0][6] * 640)], 15, (0, 155, 0), 4)
 
         plt.imshow(im)
         plt.show()
@@ -115,4 +115,4 @@ def train(epochs, lr=0.00004, batch_size=4, limit=-1, load_dict=False):
             break
 
 if __name__ == '__main__':
-    train(limit=10, epochs=4, load_dict=False)
+    train(limit=10, lr=0.0001, epochs=4, load_dict=False)
