@@ -8,7 +8,6 @@ from random import randint
 from load_data import load_piece_images
 from utils import classes_dict, num_classes, get_device, train_loop, validation_metrics, summary, dataset
 
-GEN = torch.Generator()
 normalize = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 augments = transforms.Compose([
     transforms.RandomVerticalFlip(0.3),
@@ -77,7 +76,7 @@ def load_datasets(limit=-1, balance=True):
     train_size = int(size * 0.7)
     valid_size = size - train_size
 
-    return random_split(dataset(pieces_images, pieces_classes), [train_size, valid_size], generator=GEN)
+    return random_split(dataset(pieces_images, pieces_classes), [train_size, valid_size])
 
 def create_model(pretrained=True):
     model = models.efficientnet_b2(pretrained=pretrained)
