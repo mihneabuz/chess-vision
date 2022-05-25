@@ -58,10 +58,10 @@ def train(epochs, lr=0.001, batch_size=4, limit=-1, load_dict=False):
     for image, corners in train_ds:
         im = image.numpy().transpose(1, 2, 0)
 
-        cv2.circle(im, [int(corners[0][1] * 640), int(corners[0][0] * 640)], 10, (0, 0, 255), 6)
-        cv2.circle(im, [int(corners[1][1] * 640), int(corners[1][0] * 640)], 10, (255, 0, 0), 6)
-        cv2.circle(im, [int(corners[2][1] * 640), int(corners[2][0] * 640)], 10, (0, 255, 255), 6)
-        cv2.circle(im, [int(corners[3][1] * 640), int(corners[3][0] * 640)], 10, (0, 255, 0), 6)
+        cv2.circle(im, (int(corners[0][1] * 640), int(corners[0][0] * 640)), 10, (0, 0, 255), 6)
+        cv2.circle(im, (int(corners[1][1] * 640), int(corners[1][0] * 640)), 10, (255, 0, 0), 6)
+        cv2.circle(im, (int(corners[2][1] * 640), int(corners[2][0] * 640)), 10, (0, 255, 255), 6)
+        cv2.circle(im, (int(corners[3][1] * 640), int(corners[3][0] * 640)), 10, (0, 255, 0), 6)
 
         plt.imshow(im)
         plt.show()
