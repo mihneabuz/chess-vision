@@ -5,7 +5,7 @@ from cv2 import cv2
 import matplotlib.pyplot as plt
 
 from load_data import load_data
-from utils import get_device, train_loop, validation_metrics, summary, dataset
+from utils import get_device, train_loop, summary, dataset
 
 normalize = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 
@@ -33,7 +33,7 @@ def load_datasets(limit=-1):
     return random_split(dataset(images, corners), [train_size, valid_size])
 
 def create_model(pretrained=True):
-    model = models.efficientnet_b0(pretrained=pretrained)
+    model = models.efficientnet_b2(pretrained=pretrained)
     last_layer_size = model.classifier[-1].__getattribute__('out_features')
     model.classifier.append(torch.nn.Linear(in_features=last_layer_size, out_features=8))
     return model
@@ -47,7 +47,7 @@ def loss_func(predicted, real):
     grouped = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
     return (grouped - real).pow(2).sum(2).sqrt().sum()
 
-def train(epochs, lr=0.0005, batch_size=4, limit=-1, load_dict=False):
+def train(epochs, lr=0.001, batch_size=4, limit=-1, load_dict=False):
     device = get_device()
 
     train_ds, valid_ds = load_datasets(limit=limit)
@@ -113,6 +113,8 @@ def train(epochs, lr=0.0005, batch_size=4, limit=-1, load_dict=False):
         i += 1
         if (i > 10):
             break
+
+    torch.save(model.state_dict(), './classification_weights');
 
 if __name__ == '__main__':
     train(limit=10, lr=0.0001, epochs=4, load_dict=False)
