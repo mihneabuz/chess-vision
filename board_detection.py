@@ -114,7 +114,7 @@ def train(epochs, lr=0.001, batch_size=4, limit=-1, load_dict=False):
         if (i > 10):
             break
 
-    torch.save(model.state_dict(), './classification_weights');
+    torch.save(model.state_dict(), './detection_weights');
 
 if __name__ == '__main__':
     train(limit=10, lr=0.0001, epochs=4, load_dict=False)
