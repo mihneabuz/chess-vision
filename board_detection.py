@@ -17,6 +17,10 @@ def jit_transform(x):
     y = normalize(x / 255)
     return y.half()
 
+def set_grad(model, requires_grad):
+    for param in model.parameters():
+        param.requires_grad = requires_grad
+
 def load_datasets(limit=-1):
     images = []
     corners = []
@@ -86,8 +90,18 @@ def train(epochs, lr=0.001, batch_size=4, limit=-1, load_dict=False):
 
     model.to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), eps=1e-05, lr=lr)
     criterion = loss_func
+
+    if epochs > 5:
+        optimizer = torch.optim.Adam(model.parameters(), eps=1e-05, lr=lr * 3)
+
+        set_grad(model.features, False)
+        for i in range(4):
+            curr_losses = train_loop(model, train_dl, optimizer, criterion, transform=jit_transform)
+            print(f'loss: {sum(curr_losses)}')
+        set_grad(model.features, True)
+
+    optimizer = torch.optim.Adam(model.parameters(), eps=1e-05, lr=lr)
 
     losses = []
     for i in range(epochs):
