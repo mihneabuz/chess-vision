@@ -79,7 +79,10 @@ def load_datasets(limit=-1, balance=True):
     return random_split(dataset(pieces_images, pieces_classes), [train_size, valid_size])
 
 def create_model(pretrained=True):
-    model = models.efficientnet_b2(pretrained=pretrained)
+    if pretrained:
+        model = models.efficientnet_b2(weights=models.EfficientNet_B2_Weights.DEFAULT)
+    else:
+        model = models.efficientnet_b2()
     last_layer_size = model.classifier[-1].__getattribute__('out_features')
     model.classifier.append(torch.nn.Linear(in_features=last_layer_size, out_features=num_classes))
     return model
@@ -97,7 +100,7 @@ def train(epochs, lr=0.0001, batch_size=64, limit=-1, load_dict=False):
     valid_dl = DataLoader(valid_ds, batch_size=batch_size)
 
     if load_dict:
-        model = load_model() 
+        model = load_model()
     else:
         model = create_model()
 
