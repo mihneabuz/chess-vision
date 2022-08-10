@@ -1,4 +1,4 @@
-from cv2 import cv2
+import cv2
 import json
 from os import listdir, path
 from random import sample

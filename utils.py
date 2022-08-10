@@ -17,19 +17,19 @@ cells = {
 }
 
 classes_dict = {
-    'empty': 0,
-    'pawn_w': 1,
-    'pawn_b': 2,
+    'empty':    0,
+    'pawn_w':   1,
+    'pawn_b':   2,
     'bishop_w': 3,
     'bishop_b': 4,
     'knight_w': 5,
     'knight_b': 6,
-    'rook_w': 7,
-    'rook_b': 8,
-    'queen_w': 9,
+    'rook_w':   7,
+    'rook_b':   8,
+    'queen_w':  9,
     'queen_b': 10,
-    'king_w': 11,
-    'king_b': 12,
+    'king_w':  11,
+    'king_b':  12,
 }
 
 num_classes = len(classes_dict)
@@ -96,5 +96,3 @@ class SimpleDataset(Dataset):
 
 def dataset(x, y):
     return SimpleDataset(x, y)
-
-
