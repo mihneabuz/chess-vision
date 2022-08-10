@@ -1,11 +1,11 @@
 import torch
 from torchvision import models, transforms
 from torch.utils.data import random_split, DataLoader
-from cv2 import cv2
+import cv2
 import matplotlib.pyplot as plt
 
 from load_data import load_data
-from utils import get_device, train_loop, summary, dataset
+from utils import get_device, train_loop, dataset
 
 normalize = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 
@@ -14,7 +14,8 @@ def tensor_transform(image):
     return torch.from_numpy(resized.transpose(2, 0, 1))
 
 def jit_transform(x):
-    return normalize(x / 255)
+    y = normalize(x / 255)
+    return y.half()
 
 def load_datasets(limit=-1):
     images = []
@@ -33,10 +34,13 @@ def load_datasets(limit=-1):
     return random_split(dataset(images, corners), [train_size, valid_size])
 
 def create_model(pretrained=True):
-    model = models.efficientnet_b2(pretrained=pretrained)
+    if pretrained:
+        model = models.efficientnet_b3(weights=models.EfficientNet_B3_Weights.DEFAULT)
+    else:
+        model = models.efficientnet_b3()
     last_layer_size = model.classifier[-1].__getattribute__('out_features')
     model.classifier.append(torch.nn.Linear(in_features=last_layer_size, out_features=8))
-    return model
+    return model.half()
 
 def load_model():
     model = create_model(pretrained=False)
@@ -69,16 +73,15 @@ def train(epochs, lr=0.001, batch_size=4, limit=-1, load_dict=False):
         i += 1
         if (i > 5):
             break
-           
+
     if load_dict:
-        model = load_model() 
+        model = load_model()
     else:
-        model = create_model()
+        model = create_model(pretrained=True)
 
     model.to(device)
-    summary(model, (3, 640, 640))
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), eps=1e-05, lr=lr)
     criterion = loss_func
 
     losses = []
