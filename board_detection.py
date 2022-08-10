@@ -48,8 +48,13 @@ def load_model():
     return model
 
 def loss_func(predicted, real):
-    grouped = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
-    return (grouped - real).pow(2).sum(2).sqrt().sum()
+    grouped1 = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
+    grouped2 = torch.stack((predicted[:, 6:8], predicted[:, 4:6], predicted[:, 2:4], predicted[:, 0:2]), 1)
+
+    dists1 = (grouped1 - real).pow(2).sum(2).sqrt().sum(1)
+    dists2 = (grouped2 - real).pow(2).sum(2).sqrt().sum(1)
+
+    return torch.min(dists1, dists2).sum()
 
 def train(epochs, lr=0.001, batch_size=4, limit=-1, load_dict=False):
     device = get_device()
@@ -62,10 +67,10 @@ def train(epochs, lr=0.001, batch_size=4, limit=-1, load_dict=False):
     for image, corners in train_ds:
         im = image.numpy().transpose(1, 2, 0)
 
-        cv2.circle(im, (int(corners[0][1] * 640), int(corners[0][0] * 640)), 10, (0, 0, 255), 6)
-        cv2.circle(im, (int(corners[1][1] * 640), int(corners[1][0] * 640)), 10, (255, 0, 0), 6)
-        cv2.circle(im, (int(corners[2][1] * 640), int(corners[2][0] * 640)), 10, (0, 255, 255), 6)
-        cv2.circle(im, (int(corners[3][1] * 640), int(corners[3][0] * 640)), 10, (0, 255, 0), 6)
+        cv2.circle(im, (int(corners[0][1] * 640), int(corners[0][0] * 640)), 2, (255, 0, 0), 6)
+        cv2.circle(im, (int(corners[1][1] * 640), int(corners[1][0] * 640)), 2, (0, 255, 0), 6)
+        cv2.circle(im, (int(corners[2][1] * 640), int(corners[2][0] * 640)), 2, (0, 0, 255), 6)
+        cv2.circle(im, (int(corners[3][1] * 640), int(corners[3][0] * 640)), 2, (0, 255, 255), 6)
 
         plt.imshow(im)
         plt.show()
@@ -100,15 +105,15 @@ def train(epochs, lr=0.001, batch_size=4, limit=-1, load_dict=False):
         preds = model(jit_transform(image)[None, :, :, :].to(device))
         im = image.numpy().transpose(1, 2, 0)
 
-        cv2.circle(im, [int(corners[0][1] * 640), int(corners[0][0] * 640)], 10, (0, 0, 255), 4)
-        cv2.circle(im, [int(corners[1][1] * 640), int(corners[1][0] * 640)], 10, (255, 0, 0), 4)
-        cv2.circle(im, [int(corners[2][1] * 640), int(corners[2][0] * 640)], 10, (0, 255, 255), 4)
-        cv2.circle(im, [int(corners[3][1] * 640), int(corners[3][0] * 640)], 10, (0, 255, 0), 4)
+        cv2.circle(im, [int(corners[0][1] * 640), int(corners[0][0] * 640)], 2, (255, 0, 0), 6)
+        cv2.circle(im, [int(corners[1][1] * 640), int(corners[1][0] * 640)], 2, (0, 255, 0), 6)
+        cv2.circle(im, [int(corners[2][1] * 640), int(corners[2][0] * 640)], 2, (0, 0, 255), 6)
+        cv2.circle(im, [int(corners[3][1] * 640), int(corners[3][0] * 640)], 2, (0, 255, 255), 6)
 
-        cv2.circle(im, [int(preds[0][1] * 640), int(preds[0][0] * 640)], 15, (0, 0, 155), 4)
-        cv2.circle(im, [int(preds[0][3] * 640), int(preds[0][2] * 640)], 15, (155, 0, 0), 4)
-        cv2.circle(im, [int(preds[0][5] * 640), int(preds[0][4] * 640)], 15, (0, 155, 155), 4)
-        cv2.circle(im, [int(preds[0][7] * 640), int(preds[0][6] * 640)], 15, (0, 155, 0), 4)
+        cv2.circle(im, [int(preds[0][1] * 640), int(preds[0][0] * 640)], 10, (255, 0, 0), 4)
+        cv2.circle(im, [int(preds[0][3] * 640), int(preds[0][2] * 640)], 10, (0, 255, 0), 4)
+        cv2.circle(im, [int(preds[0][5] * 640), int(preds[0][4] * 640)], 10, (0, 0, 255), 4)
+        cv2.circle(im, [int(preds[0][7] * 640), int(preds[0][6] * 640)], 10, (0, 255, 255), 4)
 
         plt.imshow(im)
         plt.show()
