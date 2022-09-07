@@ -53,6 +53,11 @@ def load_model():
     model.load_state_dict(torch.load('./detection_weights'))
     return model
 
+def inference():
+    model = load_model()
+    model.eval()
+    return lambda img: model(jit_transform(tensor_transform(img))[None, :, :, :]).detach().numpy()
+
 def loss_func(predicted, real):
     grouped1 = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
     grouped2 = torch.stack((predicted[:, 6:8], predicted[:, 4:6], predicted[:, 2:4], predicted[:, 0:2]), 1)

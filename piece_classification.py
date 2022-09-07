@@ -92,6 +92,11 @@ def load_model():
     model.load_state_dict(torch.load('./classification_weights'))
     return model
 
+def inference():
+    model = load_model()
+    model.eval()
+    return lambda img: model(jit_transform(tensor_transform(img))[None, :, :, :]).detach().numpy()
+
 def train(epochs, lr=0.0001, batch_size=64, limit=-1, load_dict=False):
     device = get_device()
 
