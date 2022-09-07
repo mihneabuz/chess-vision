@@ -10,15 +10,14 @@ from utils import get_device, train_loop, dataset
 
 normalize = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 
-size = 200
+size = 160
 
 def tensor_transform(image):
     resized = cv2.resize(image, (size, size))
     return torch.from_numpy(resized.transpose(2, 0, 1))
 
 def jit_transform(x):
-    y = normalize(x / 255)
-    return y.half()
+    return normalize(x / 255)
 
 def set_grad(model, requires_grad):
     for param in model.parameters():
@@ -47,7 +46,7 @@ def create_model(pretrained=True):
         model = models.efficientnet_v2_m()
     last_layer_size = model.classifier[-1].__getattribute__('out_features')
     model.classifier.append(torch.nn.Linear(in_features=last_layer_size, out_features=8))
-    return model.half()
+    return model
 
 def load_model():
     model = create_model(pretrained=False)
@@ -63,7 +62,7 @@ def loss_func(predicted, real):
 
     return torch.min(dists1, dists2).sum()
 
-def train(epochs, lr=0.001, batch_size=4, limit=-1, load_dict=False):
+def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
     device = get_device()
 
     train_ds, valid_ds = load_datasets(limit=limit)
@@ -83,7 +82,7 @@ def train(epochs, lr=0.001, batch_size=4, limit=-1, load_dict=False):
         plt.show()
 
         i += 1
-        if (i > 2):
+        if (i > 3):
             break
 
     if load_dict:
@@ -93,7 +92,7 @@ def train(epochs, lr=0.001, batch_size=4, limit=-1, load_dict=False):
 
     model.to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), eps=1e-05, lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = loss_func
 
     if epochs > 5:
@@ -139,10 +138,10 @@ def train(epochs, lr=0.001, batch_size=4, limit=-1, load_dict=False):
         plt.show()
 
         i += 1
-        if (i > 15):
+        if (i > 20):
             break
 
     torch.save(model.state_dict(), './detection_weights');
 
 if __name__ == '__main__':
-    train(limit=10, lr=0.0001, epochs=4, load_dict=False)
+    train(limit=10, lr=0.0002, epochs=4, batch_size=16, load_dict=False)
