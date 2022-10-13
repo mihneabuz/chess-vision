@@ -72,7 +72,7 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
 
     train_ds, valid_ds = load_datasets(limit=limit)
     train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
-    valid_dl = DataLoader(valid_ds, batch_size=batch_size)
+    valid_dl = DataLoader(valid_ds, batch_size=2)
 
     i = 0
     for image, corners in train_ds:
@@ -97,12 +97,12 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
 
     model.to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.01)
     criterion = loss_func
 
-    if epochs > 5:
+    if epochs > 10:
         set_grad(model.features, False)
-        for i in range(4):
+        for i in range(5):
             curr_losses = train_loop(model, train_dl, optimizer, criterion, transform=jit_transform)
             print(f'loss: {sum(curr_losses)}')
         set_grad(model.features, True)

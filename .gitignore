@@ -1,4 +1,6 @@
 data
+env
 boards
+*weights*
 .DS_Store
 __pycache__

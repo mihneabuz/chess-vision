@@ -1,0 +1,9 @@
+numpy
+matplotlib
+opencv-python
+sklearn
+torch
+torchvision
+torchsummary
+tqdm
+kaggle

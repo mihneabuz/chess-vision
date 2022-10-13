@@ -142,4 +142,4 @@ def train(epochs, lr=0.0001, batch_size=64, limit=-1, load_dict=False):
     torch.save(model.state_dict(), './classification_weights');
 
 if __name__ == "__main__":
-    train(1, batch_size=32, limit=10, load_dict=True)
+    train(1, batch_size=32, limit=10, load_dict=False)
