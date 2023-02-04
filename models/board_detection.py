@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from load_data import load_data
 from utils import get_device, train_loop, dataset
-from service import Service
+import service as service
 
 size = 160
 
@@ -148,7 +148,7 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
 
     torch.save(model.state_dict(), './board_detection_weights');
 
-class BoardDetectionService(Service):
+class Service(service.Service):
     def __init__(self):
         self.model = create_model(pretrained=False);
         self.infer = None
