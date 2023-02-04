@@ -7,8 +7,7 @@ from tqdm import tqdm
 
 from load_data import load_data
 from utils import get_device, train_loop, dataset
-
-normalize = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+from service import Service
 
 size = 160
 
@@ -17,6 +16,7 @@ def tensor_transform(image):
     return torch.from_numpy(resized.transpose(2, 0, 1))
 
 def jit_transform(x):
+    normalize = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     return normalize(x / 255)
 
 def set_grad(model, requires_grad):
@@ -50,7 +50,7 @@ def create_model(pretrained=True):
 
 def load_model():
     model = create_model(pretrained=False)
-    model.load_state_dict(torch.load('./detection_weights'))
+    model.load_state_dict(torch.load('./board_detection_weights'))
     return model
 
 def inference():
@@ -146,7 +146,28 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
         if (i > 20):
             break
 
-    torch.save(model.state_dict(), './detection_weights');
+    torch.save(model.state_dict(), './board_detection_weights');
+
+class BoardDetectionService(Service):
+    def __init__(self):
+        self.model = create_model(pretrained=False);
+        self.infer = None
+
+    def transform(self, images):
+        return torch.stack([jit_transform(tensor_transform(img)) for img in images])
+
+    def get_model_name(self):
+        return "board_detection"
+
+    def load_model(self, file):
+        self.model.load_state_dict(torch.load(file))
+        self.infer = lambda inputs: self.model(self.transform(inputs)).detach().numpy()
+
+    def predict(self, inputs):
+        if self.infer == None:
+            return None;
+
+        return self.infer(inputs)
 
 if __name__ == '__main__':
     train(limit=10, lr=0.0002, epochs=4, batch_size=16, load_dict=False)
