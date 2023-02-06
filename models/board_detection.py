@@ -4,10 +4,9 @@ from torch.utils.data import random_split, DataLoader
 import cv2
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-import numpy as np
 
 from utils.load_data import load_data
-from utils.utils import get_device, train_loop, dataset, serialize_array, bytes_to_file
+from utils.utils import get_device, train_loop, dataset, serialize_array, bytes_as_file, image_from_bytes
 import service as service
 
 size = 160
@@ -155,10 +154,10 @@ class Service(service.Service):
         self.model = create_model(pretrained=False);
 
     def load_model(self, data):
-        self.model.load_state_dict(torch.load(bytes_to_file(data)))
+        self.model.load_state_dict(torch.load(bytes_as_file(data)))
 
     def _transform_in(self, input):
-        image = cv2.imdecode(np.frombuffer(input[0], np.uint8), cv2.IMREAD_COLOR)
+        image = image_from_bytes(input[0])
         return jit_transform(tensor_transform(image))
 
     def _transform_out(self, result):
@@ -168,4 +167,4 @@ class Service(service.Service):
         return self.model(torch.stack(data)).detach().numpy()
 
 if __name__ == '__main__':
-    train(limit=10, lr=0.0002, epochs=4, batch_size=16, load_dict=False)
+    train(limit=-1, lr=0.0002, epochs=20, batch_size=16, load_dict=False)

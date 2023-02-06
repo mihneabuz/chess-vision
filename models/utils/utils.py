@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 from io import BytesIO
 import torch
 import torchsummary
@@ -87,11 +88,14 @@ class SimpleDataset(Dataset):
 def dataset(x, y):
     return SimpleDataset(x, y)
 
-def bytes_to_file(bytes):
+def bytes_as_file(bytes):
     memfile = BytesIO()
     memfile.write(bytes)
     memfile.seek(0)
     return memfile
+
+def image_from_bytes(bytes):
+    return cv2.imdecode(np.frombuffer(bytes, np.uint8), cv2.IMREAD_COLOR)
 
 def serialize_array(ndarray):
     memfile = BytesIO()
@@ -99,5 +103,5 @@ def serialize_array(ndarray):
     return memfile.getvalue()
 
 def deserialize_array(bytes):
-    memfile = bytes_to_file(bytes)
+    memfile = bytes_as_file(bytes)
     return np.load(memfile)

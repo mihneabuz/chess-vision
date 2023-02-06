@@ -1,5 +1,9 @@
 use std::env;
 
+pub fn get_service_type() -> String {
+    env::var("SERVICETYPE").expect("SERVICETYPE variable not set")
+}
+
 pub fn get_model_name() -> String {
     env::var("MODELNAME").expect("MODELNAME variable not set")
 }
