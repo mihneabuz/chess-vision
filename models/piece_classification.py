@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 from collections import Counter
 from random import randint
 
-from load_data import load_piece_images
-from utils import classes_dict, num_classes, get_device, train_loop, validation_metrics, summary, dataset
+from utils.load_data import load_data
+from utils.process import crop_board, crop_pieces
+from utils.utils import classes_dict, num_classes, get_device, train_loop, validation_metrics, summary, dataset
 
 normalize = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 augments = transforms.Compose([
@@ -26,6 +27,16 @@ def augment(x):
 def set_grad(model, requires_grad):
     for param in model.parameters():
         param.requires_grad = requires_grad
+
+def load_board_images(max=-1):
+    for image, annotations in load_data(max=max):
+        yield image, annotations['corners']
+
+def load_piece_images(max=-1):
+    for image, annotations in load_data(max=max):
+        board_image = crop_board(image, annotations['corners'])
+        pieces, labels = crop_pieces(board_image, annotations['config'])
+        yield from zip(pieces, labels)
 
 def load_datasets(limit=-1, balance=True):
     pieces_images = []
@@ -142,4 +153,4 @@ def train(epochs, lr=0.0001, batch_size=64, limit=-1, load_dict=False):
     torch.save(model.state_dict(), './classification_weights');
 
 if __name__ == "__main__":
-    train(1, batch_size=32, limit=10, load_dict=False)
+    train(4, batch_size=32, limit=-1, load_dict=False)

@@ -4,8 +4,6 @@ from os import listdir, path
 from random import sample
 from tqdm import tqdm
 
-from process import crop_board, crop_pieces
-
 DATA = 'boards/data'
 
 def download_data():
@@ -29,26 +27,8 @@ def load_data(max=-1):
         annotations = json.load(open(DATA + '/' + file + '.json'))
         yield image, annotations
 
-def load_board_images(max=-1):
-    for image, annotations in load_data(max=max):
-        yield image, annotations['corners']
-
-def load_piece_images(max=-1):
-    for image, annotations in load_data(max=max):
-        board_image = crop_board(image, annotations['corners'])
-        pieces, labels = crop_pieces(board_image, annotations['config'])
-        yield from zip(pieces, labels)
 
 if __name__ == "__main__":
     for image, labels in load_data(1):
         print(image.shape)
         print(labels)
-
-    for image, labels in load_board_images(1):
-        print(image.shape)
-        print(labels)
-
-    for piece, label in load_piece_images(1):
-        print(piece.shape)
-        print(label)
-        break

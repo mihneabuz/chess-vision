@@ -4,9 +4,10 @@ from torch.utils.data import random_split, DataLoader
 import cv2
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import numpy as np
 
-from load_data import load_data
-from utils import get_device, train_loop, dataset
+from utils.load_data import load_data
+from utils.utils import get_device, train_loop, dataset, serialize_array, bytes_to_file
 import service as service
 
 size = 160
@@ -150,24 +151,21 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
 
 class Service(service.Service):
     def __init__(self):
+        self.name = 'board_detection'
         self.model = create_model(pretrained=False);
-        self.infer = None
 
-    def transform(self, images):
-        return torch.stack([jit_transform(tensor_transform(img)) for img in images])
+    def load_model(self, data):
+        self.model.load_state_dict(torch.load(bytes_to_file(data)))
 
-    def get_model_name(self):
-        return "board_detection"
+    def _transform_in(self, input):
+        image = cv2.imdecode(np.frombuffer(input[0], np.uint8), cv2.IMREAD_COLOR)
+        return jit_transform(tensor_transform(image))
 
-    def load_model(self, file):
-        self.model.load_state_dict(torch.load(file))
-        self.infer = lambda inputs: self.model(self.transform(inputs)).detach().numpy()
+    def _transform_out(self, result):
+        return serialize_array(result)
 
-    def predict(self, inputs):
-        if self.infer == None:
-            return None;
-
-        return self.infer(inputs)
+    def _process_batch(self, data):
+        return self.model(torch.stack(data)).detach().numpy()
 
 if __name__ == '__main__':
     train(limit=10, lr=0.0002, epochs=4, batch_size=16, load_dict=False)
