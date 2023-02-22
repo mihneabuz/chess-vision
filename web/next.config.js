@@ -2,8 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    appDir: true
-  }
-}
+    appDir: true,
+  },
+  output: 'standalone',
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

@@ -1,0 +1,26 @@
+version: "3.1"
+services:
+
+  web-frontend:
+    container_name: web-frontend
+    build:
+      dockerfile: Dockerfile
+      context: ./web
+    ports:
+      - 80:3000
+    environment:
+      FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
+    links:
+      - file-server
+
+  file-server:
+    container_name: file-server
+    image: mayth/simple-upload-server
+    volumes:
+      - file-storage:/var/root
+    ports:
+      - 3001:80
+    command: -token ${FILE_SERVER_TOKEN} -port 80 /var/root
+
+volumes:
+  file-storage:
