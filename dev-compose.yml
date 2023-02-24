@@ -12,6 +12,7 @@ services:
       FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
     links:
       - file-server
+      - rabbitmq
 
   file-server:
     container_name: file-server
@@ -22,5 +23,18 @@ services:
       - 3001:80
     command: -token ${FILE_SERVER_TOKEN} -port 80 /var/root
 
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3-management
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - rabbit-storage:/var/lib/rabbitmq/
+      - rabbit-logs:/var/log/rabbitmq
+
+
 volumes:
   file-storage:
+  rabbit-storage:
+  rabbit-logs:
