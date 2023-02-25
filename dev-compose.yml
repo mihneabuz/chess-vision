@@ -9,7 +9,10 @@ services:
     ports:
       - 80:3000
     environment:
+      FILE_SERVER: file-server
       FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
+      MESSAGE_BROKER: rabbitmq
+      MESSAGE_QUEUE: stage1
     links:
       - file-server
       - rabbitmq
