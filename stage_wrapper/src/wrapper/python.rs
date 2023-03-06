@@ -14,7 +14,7 @@ impl PythonWrapper {
     pub fn new(model: String) -> Result<Self> {
         pyo3::prepare_freethreaded_python();
 
-        let path = crate::utils::get_modules_path();
+        let path = crate::utils::modules_path();
         let service = Python::with_gil(|py| -> PyResult<Py<PyAny>> {
             let syspath: &PyList = py.import("sys")?.getattr("path")?.downcast::<PyList>()?;
             syspath.insert(0, &path)?;

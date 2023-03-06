@@ -36,7 +36,6 @@ services:
       - rabbit-storage:/var/lib/rabbitmq/
       - rabbit-logs:/var/log/rabbitmq
 
-
 volumes:
   file-storage:
   rabbit-storage:

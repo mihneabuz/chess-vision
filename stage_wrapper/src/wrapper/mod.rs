@@ -15,7 +15,7 @@ pub mod factory {
     pub fn create(service_type: String) -> Result<Box<dyn ServiceWrapper>> {
         Ok(match service_type.as_str() {
             "python" => {
-                let model = utils::get_model_name();
+                let model = utils::model_name();
                 Box::new(PythonWrapper::new(model)?)
             },
             _ => panic!("unknown service type")

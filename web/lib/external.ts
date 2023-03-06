@@ -25,7 +25,13 @@ async function publishId(id: string) {
   const channel = await connection.createChannel();
   await channel.assertQueue(config.messageQueue);
 
-  channel.sendToQueue(config.messageQueue, Buffer.from(id));
+  const message = JSON.stringify({
+    id,
+    data: ""
+  });
+
+  console.log(message)
+  channel.sendToQueue(config.messageQueue, Buffer.from(message));
 
   await channel.close();
   await connection.close();
