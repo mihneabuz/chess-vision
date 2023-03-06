@@ -17,8 +17,8 @@ pub mod factory {
             "python" => {
                 let model = utils::model_name();
                 Box::new(PythonWrapper::new(model)?)
-            },
-            _ => panic!("unknown service type")
+            }
+            _ => panic!("unknown service type"),
         })
     }
 }

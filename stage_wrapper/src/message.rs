@@ -51,11 +51,7 @@ pub async fn publisher(conn: &Connection, mut receiver: UnboundedReceiver<Messag
 
     let message_queue = utils::next_queue();
     channel
-        .queue_declare(
-            &message_queue,
-            QueueDeclareOptions::default(),
-            FieldTable::default(),
-        )
+        .queue_declare(&message_queue, QueueDeclareOptions::default(), FieldTable::default())
         .await?;
 
     loop {

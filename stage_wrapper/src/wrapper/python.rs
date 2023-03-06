@@ -1,13 +1,13 @@
 use std::io::Result;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyBytes};
+use pyo3::types::{PyBytes, PyList};
 
 use super::ServiceWrapper;
 
 pub struct PythonWrapper {
     model: String,
-    service: Py<PyAny>
+    service: Py<PyAny>,
 }
 
 impl PythonWrapper {
@@ -32,7 +32,9 @@ impl PythonWrapper {
 impl ServiceWrapper for PythonWrapper {
     fn process(&self, data: &[(Vec<u8>, Vec<u8>)]) -> Result<Vec<Vec<u8>>> {
         let results = Python::with_gil(|py| -> PyResult<Vec<Vec<u8>>> {
-            let input = PyList::new(py, data.iter().map(|(image, data)| (PyBytes::new(py, image), PyBytes::new(py, data))));
+            let input = PyList::new(py,
+                data.iter().map(|(image, data)| (PyBytes::new(py, image), PyBytes::new(py, data))),
+            );
             let output = self.service.getattr(py, "process")?.call1(py, (input,))?;
 
             let mut results = Vec::new();
