@@ -39,7 +39,7 @@ pub async fn consumer(conn: &Connection, sender: Sender<Message>) -> Result<()> 
         if let Ok(delivery) = delivery {
             if let Ok(message) = serde_json::from_slice::<Message>(&delivery.data) {
                 let image_bytes = crate::file::fetch_image(&message.id).await.unwrap();
-                println!("{:?}", image_bytes);
+                println!("image bytes {:?}", image_bytes.len());
                 sender.send(message).unwrap();
             }
         }
