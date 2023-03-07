@@ -1,3 +1,4 @@
+mod file;
 mod message;
 mod utils;
 mod wrapper;
@@ -9,17 +10,17 @@ use message::{consumer, publisher, Message};
 #[tokio::main]
 async fn main() -> Result<()> {
     println!("starting stage {:?}", utils::model_name());
-    println!("connecting to {:?}", utils::amqp_addr());
 
     let conn = loop {
-        if let Ok(conn) = Connection::connect(&utils::amqp_addr(), ConnectionProperties::default()).await {
+        let conn = Connection::connect(&utils::amqp_addr(), ConnectionProperties::default()).await;
+        if let Ok(conn) = conn {
             break Box::leak(Box::new(conn));
         }
 
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     };
 
-    println!("connection done");
+    println!("connected to message queue");
 
     let (consume_sender, consume_receiver) = std::sync::mpsc::channel::<Message>();
     let (publish_sender, publish_receiver) = tokio::sync::mpsc::unbounded_channel::<Message>();
