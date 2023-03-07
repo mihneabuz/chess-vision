@@ -36,6 +36,24 @@ services:
       - rabbit-storage:/var/lib/rabbitmq/
       - rabbit-logs:/var/log/rabbitmq
 
+  board_detection:
+    container_name: board_detection
+    build:
+      dockerfile: Dockerfile
+      context: ./stage_wrapper
+    environment:
+      SERVICE_TYPE: python
+      MODEL_NAME: board_detection
+      FILE_SERVER: file-server
+      FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
+      MODULES_PATH: /model
+      MESSAGE_BROKER: rabbitmq
+      CURRENT_QUEUE: stage1
+      NEXT_QUEUE: stage2
+    links:
+      - rabbitmq
+      - file-server
+
 volumes:
   file-storage:
   rabbit-storage:

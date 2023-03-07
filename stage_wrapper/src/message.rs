@@ -57,6 +57,7 @@ pub async fn publisher(conn: &Connection, mut receiver: UnboundedReceiver<Messag
     loop {
         let message = receiver.recv().await.unwrap();
         let payload = serde_json::to_vec(&message).unwrap();
+        println!("{:?}", message);
         channel
             .basic_publish(
                 "",
