@@ -8,6 +8,8 @@ use futures::join;
 use lapin::{Connection, ConnectionProperties, Result};
 use message::{consumer, publisher, Message};
 
+use crate::file::fetch_file_sync;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     println!("starting stage {:?}", utils::model_name());
@@ -29,12 +31,32 @@ async fn main() -> Result<()> {
     let worker = tokio::task::spawn_blocking(move || {
         let service = wrapper::create(utils::service_type()).expect("could not load service");
 
-        while let Ok((message, image)) = consume_receiver.recv() {
-            println!("message: {:?}", message);
-            println!("image: {:?}", image.len());
-            println!("hash: {:?}", md5::compute(&image));
+        let resource = service.resource().expect("could not get service resource");
+        let data = fetch_file_sync(&resource).expect("could not fetch resource for service");
+        service.configure(&data).expect("could not configure service");
 
-            publish_sender.send(Message::new(message.id, message.hash, Vec::new())).unwrap();
+        let mut messages = Vec::new();
+        loop {
+            while let Ok((message, image)) = consume_receiver.try_recv() {
+                messages.push((message, image));
+            }
+
+            if messages.len() > 0 {
+                println!("processing {:?} images", messages.len());
+
+                let data = messages
+                    .iter()
+                    .map(|(message, image)| -> (&[u8], &[u8]) { (&image, &message.data) })
+                    .collect::<Vec<(&[u8], &[u8])>>();
+
+                let result = service.process(&data).unwrap();
+
+                messages.drain(..).map(|m| m.0).zip(result.into_iter()).for_each(
+                    |(message, data)| {
+                        publish_sender.send(Message::new(message.id, message.hash, data)).unwrap();
+                    },
+                );
+            }
         }
     });
 

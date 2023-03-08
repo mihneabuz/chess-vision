@@ -6,7 +6,9 @@ use std::io::Result;
 use crate::utils;
 
 pub trait ServiceWrapper {
-    fn process(&self, data: &[(Vec<u8>, Vec<u8>)]) -> std::io::Result<Vec<Vec<u8>>>;
+    fn resource(&self) -> Result<String>;
+    fn configure(&self, data: &[u8]) -> Result<()>;
+    fn process(&self, data: &[(&[u8], &[u8])]) -> Result<Vec<Vec<u8>>>;
 }
 
 pub fn create(service_type: String) -> Result<Box<dyn ServiceWrapper>> {

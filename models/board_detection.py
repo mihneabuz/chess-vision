@@ -154,7 +154,7 @@ class Service(service.Service):
         self.model = create_model(pretrained=False);
 
     def load_model(self, data):
-        self.model.load_state_dict(torch.load(bytes_as_file(data)))
+        self.model.load_state_dict(torch.load(bytes_as_file(data), map_location=torch.device('cpu')))
 
     def _transform_in(self, input):
         image = image_from_bytes(input[0])
