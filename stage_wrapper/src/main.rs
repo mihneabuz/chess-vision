@@ -57,6 +57,8 @@ async fn main() -> Result<()> {
                     },
                 );
             }
+
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
     });
 
