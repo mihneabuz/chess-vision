@@ -3,6 +3,7 @@ mod message;
 mod utils;
 mod wrapper;
 
+use bytes::Bytes;
 use futures::join;
 use lapin::{Connection, ConnectionProperties, Result};
 use message::{consumer, publisher, Message};
@@ -22,15 +23,18 @@ async fn main() -> Result<()> {
 
     println!("connected to message queue");
 
-    let (consume_sender, consume_receiver) = std::sync::mpsc::channel::<Message>();
+    let (consume_sender, consume_receiver) = std::sync::mpsc::channel::<(Message, Bytes)>();
     let (publish_sender, publish_receiver) = tokio::sync::mpsc::unbounded_channel::<Message>();
 
     let worker = tokio::task::spawn_blocking(move || {
         let service = wrapper::create(utils::service_type()).expect("could not load service");
 
-        while let Ok(message) = consume_receiver.recv() {
+        while let Ok((message, image)) = consume_receiver.recv() {
             println!("message: {:?}", message);
-            publish_sender.send(Message::new(message.id, Vec::new())).unwrap();
+            println!("image: {:?}", image.len());
+            println!("hash: {:?}", md5::compute(&image));
+
+            publish_sender.send(Message::new(message.id, message.hash, Vec::new())).unwrap();
         }
     });
 

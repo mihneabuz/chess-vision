@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import amqplib from 'amqplib';
 import { getConfig } from './config';
+import md5 from 'md5';
 
 const config = getConfig();
 
@@ -20,17 +21,18 @@ async function sendFile(file: File, name: string) {
   return await res.json();
 }
 
-async function publishId(id: string) {
+async function publishId(id: string, hash: string) {
   const connection = await amqplib.connect(`amqp://${config.messageBroker}`);
   const channel = await connection.createChannel();
   await channel.assertQueue(config.messageQueue);
 
   const message = JSON.stringify({
     id,
-    data: ""
+    hash,
+    data: '',
   });
 
-  console.log(message)
+  console.log(message);
   channel.sendToQueue(config.messageQueue, Buffer.from(message));
 
   await channel.close();
@@ -47,7 +49,8 @@ export async function publishFile(file: File) {
     throw new Error('Could not send file to server: ' + responseString);
   }
 
-  await publishId(id);
+  const hash = await md5(Buffer.from(await file.arrayBuffer()));
+  await publishId(id, hash);
 
   return id;
 }

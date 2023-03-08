@@ -1,5 +1,6 @@
 use std::sync::mpsc::Sender;
 
+use bytes::Bytes;
 use futures::stream::StreamExt;
 use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
 use lapin::{options::BasicConsumeOptions, types::FieldTable, Connection};
@@ -12,17 +13,18 @@ use crate::utils;
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Message {
     pub id: String,
+    pub hash: String,
     #[serde(with = "serde_bytes")]
     pub data: Vec<u8>,
 }
 
 impl Message {
-    pub fn new(id: String, data: Vec<u8>) -> Self {
-        Self { id, data }
+    pub fn new(id: String, hash: String, data: Vec<u8>) -> Self {
+        Self { id, hash, data }
     }
 }
 
-pub async fn consumer(conn: &Connection, sender: Sender<Message>) -> Result<()> {
+pub async fn consumer(conn: &Connection, sender: Sender<(Message, Bytes)>) -> Result<()> {
     let channel = conn.create_channel().await?;
 
     let message_queue = utils::current_queue();
@@ -39,8 +41,12 @@ pub async fn consumer(conn: &Connection, sender: Sender<Message>) -> Result<()> 
         if let Ok(delivery) = delivery {
             if let Ok(message) = serde_json::from_slice::<Message>(&delivery.data) {
                 let image_bytes = crate::file::fetch_image(&message.id).await.unwrap();
-                println!("image bytes {:?}", image_bytes.len());
-                sender.send(message).unwrap();
+
+                if format!("{:?}", md5::compute(&image_bytes)) != message.hash {
+                    println!("IMAGE HASH WRONG!");
+                }
+
+                sender.send((message, image_bytes)).unwrap();
             }
         }
     }
