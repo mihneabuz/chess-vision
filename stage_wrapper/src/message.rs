@@ -1,6 +1,8 @@
+use std::pin::Pin;
 use std::sync::mpsc::Sender;
 
 use bytes::Bytes;
+use futures::Future;
 use futures::stream::StreamExt;
 use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
 use lapin::{options::BasicConsumeOptions, types::FieldTable, Connection};
@@ -28,14 +30,19 @@ pub async fn consumer(conn: &Connection, sender: Sender<(Message, Bytes)>) -> Re
     let channel = conn.create_channel().await?;
 
     let message_queue = utils::current_queue();
-    let mut consumer = channel
-        .basic_consume(
-            &message_queue,
-            "service",
-            BasicConsumeOptions::default(),
-            FieldTable::default(),
-        )
-        .await?;
+    let mut consumer = loop {
+        if let Ok(consumer) = channel
+            .basic_consume(
+                &message_queue,
+                "service",
+                BasicConsumeOptions::default(),
+                FieldTable::default(),
+            )
+            .await
+        {
+            break consumer;
+        }
+    };
 
     while let Some(delivery) = consumer.next().await {
         if let Ok(delivery) = delivery {

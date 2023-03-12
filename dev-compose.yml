@@ -19,12 +19,21 @@ services:
 
   file-server:
     container_name: file-server
-    image: mayth/simple-upload-server
+    image: mayth/simple-upload-server:latest
     volumes:
       - file-storage:/var/root
     ports:
       - 3001:80
     command: -token ${FILE_SERVER_TOKEN} -port 80 -upload_limit 400000000 /var/root
+
+  weights-up:
+    container_name: weights-up
+    image: curlimages/curl:latest
+    volumes:
+      - ./models:/models
+    links:
+      - file-server
+    command: sh -c 'for file in /models/*_weights; do echo "uploading $$file" ; curl -Ffile=@$$file "http://file-server/upload?token=${FILE_SERVER_TOKEN}"; done'
 
   rabbitmq:
     container_name: rabbitmq
@@ -36,8 +45,8 @@ services:
       - rabbit-storage:/var/lib/rabbitmq/
       - rabbit-logs:/var/log/rabbitmq
 
-  board_detection:
-    container_name: board_detection
+  board_det:
+    container_name: board_det
     build:
       dockerfile: Dockerfile
       context: ./stage_wrapper
@@ -54,8 +63,8 @@ services:
       - rabbitmq
       - file-server
 
-  piece_classification:
-    container_name: piece_classification
+  piece_class:
+    container_name: piece_class
     build:
       dockerfile: Dockerfile
       context: ./stage_wrapper
