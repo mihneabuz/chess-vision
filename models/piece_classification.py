@@ -7,7 +7,8 @@ from random import randint
 
 from utils.load_data import load_data
 from utils.process import crop_board, crop_pieces
-from utils.utils import classes_dict, num_classes, get_device, train_loop, validation_metrics, summary, dataset
+from utils.utils import classes_dict, image_from_bytes, bytes_as_file, serialize_array, num_classes, get_device, train_loop, validation_metrics, summary, dataset
+import service as service
 
 normalize = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 augments = transforms.Compose([
@@ -100,7 +101,7 @@ def create_model(pretrained=True):
 
 def load_model():
     model = create_model(pretrained=False)
-    model.load_state_dict(torch.load('./classification_weights'))
+    model.load_state_dict(torch.load('./piece_classification_weights'))
     return model
 
 def inference():
@@ -150,7 +151,25 @@ def train(epochs, lr=0.0001, batch_size=64, limit=-1, load_dict=False):
     for i, label in enumerate(classes_dict.keys()):
         print(f'{label:10} {precision[i]:.2f} {recall[i]:.2f}')
 
-    torch.save(model.state_dict(), './classification_weights');
+    torch.save(model.state_dict(), './piece_classification_weights');
+
+class Service(service.Service):
+    def __init__(self):
+        self.name = 'piece_classification'
+        self.model = create_model(pretrained=False);
+
+    def load_model(self, data):
+        self.model.load_state_dict(torch.load(bytes_as_file(data), map_location=torch.device('cpu')))
+
+    def _transform_in(self, input):
+        image = image_from_bytes(input[0])
+        return jit_transform(tensor_transform(image))
+
+    def _transform_out(self, result):
+        return serialize_array(result)
+
+    def _process_batch(self, data):
+        return self.model(torch.stack(data)).detach().numpy()
 
 if __name__ == "__main__":
     train(4, batch_size=32, limit=-1, load_dict=False)

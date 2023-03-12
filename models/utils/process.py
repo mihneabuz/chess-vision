@@ -92,7 +92,7 @@ def crop_pieces(image, pieces=None):
         cell_coords = cells[cell]
         cellBoundsRel = getCellBoundingBoxRel(cell_coords[0], cell_coords[1])
         cellBoundsAbs = np.round(np.multiply(cellBoundsRel.T, boardImgSize)).astype(int)
-        
+
         piece_image = image[cellBoundsAbs[0,0]:cellBoundsAbs[0,1],cellBoundsAbs[1,0]:cellBoundsAbs[1,1]]
 
         images.append(piece_image)
@@ -104,7 +104,7 @@ def crop_pieces(image, pieces=None):
 
 if __name__ == "__main__":
     from load_data import load_data
-    
+
     for image, annotations in load_data(1):
         corners = annotations['corners']
         pieces = annotations['config']
@@ -123,4 +123,3 @@ if __name__ == "__main__":
             plt.imshow(piece_images[i])
             plt.show()
             break
-
