@@ -31,6 +31,26 @@ def stack_corners(corners):
         [corners[6], corners[7]],
     ]
 
+def unstack_corners(corners):
+    return [x for corner in corners for x in corner]
+
+def print_board(pieces):
+    BOLD = '\033[1m'
+    END = '\033[0m'
+    GRAY = '\033[90m'
+    RED = '\033[91m'
+
+    pieces_map = [' ', 'p', 'P', 'b', 'B', 'n', 'N', 'r', 'R', 'q', 'Q', 'k', 'K']
+    pieces_map = [RED + piece + END if i % 2 == 0 else BOLD + piece + END for i, piece in enumerate(pieces_map)]
+
+    for i in range(8):
+        print(GRAY + '----------------------------------' + END)
+        for j in range(8):
+            print(GRAY + '|' + END, end=' ')
+            print(pieces_map[found[i * 8 + j]], end=' ')
+        print(GRAY + '|' + END)
+    print(GRAY + '----------------------------------' + END)
+
 
 if __name__ == '__main__':
     file = argv[1]
@@ -52,7 +72,8 @@ if __name__ == '__main__':
     print(image.shape)
 
     input1 = (image_bytes, bytes())
-    result1 = board_detection.process([input1])
+    result1 = board_detection.process([input1, input1])
+    print('output board_detection', result1)
 
     corners = stack_corners(deserialize_array(result1[0]))
     print(corners)
@@ -60,6 +81,7 @@ if __name__ == '__main__':
     #  DELETE:
     import json
     corners = json.load(open('boards/data/17.json'))['corners']
+    result1[0] = [max([x, 0]) for x in result1[0]]
 
     plt.imshow(add_corners(image, corners))
     plt.show()
@@ -75,4 +97,10 @@ if __name__ == '__main__':
     plt.tight_layout()
     plt.show()
 
-    input2 = ()
+    input2 = (image_bytes, unstack_corners(corners))
+    result2 = piece_classification.process([input2, input2])
+    found = deserialize_array(result2[0])
+    print_board(found)
+
+    plt.imshow(cropped)
+    plt.show()

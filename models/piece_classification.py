@@ -163,13 +163,20 @@ class Service(service.Service):
 
     def _transform_in(self, input):
         image = image_from_bytes(input[0])
-        return jit_transform(tensor_transform(image))
+        corners = [
+            [input[1][0], input[1][1]],
+            [input[1][2], input[1][3]],
+            [input[1][4], input[1][5]],
+            [input[1][6], input[1][7]],
+        ]
+        pieces, _ = crop_pieces(crop_board(image, corners))
+        return torch.stack([jit_transform(tensor_transform(piece)) for piece in pieces])
 
     def _transform_out(self, result):
-        return serialize_array(result)
+        return serialize_array(result.detach().numpy())
 
     def _process_batch(self, data):
-        return self.model(torch.stack(data)).detach().numpy()
+        return torch.argmax(self.model(torch.concat(data)), 1).split(64)
 
 if __name__ == "__main__":
     train(4, batch_size=32, limit=-1, load_dict=False)
