@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torchvision import models, transforms
 from torch.utils.data import random_split, DataLoader
@@ -161,10 +162,10 @@ class Service(service.Service):
         return jit_transform(tensor_transform(image))
 
     def _transform_out(self, result):
-        return serialize_array(result)
+        return serialize_array(result.astype(np.float32))
 
     def _process_batch(self, data):
         return self.model(torch.stack(data)).detach().numpy()
 
 if __name__ == '__main__':
-    train(limit=-1, lr=0.0002, epochs=20, batch_size=16, load_dict=False)
+    train(20, lr=0.0001, batch_size=20, load_dict=True)

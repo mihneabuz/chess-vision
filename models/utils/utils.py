@@ -88,20 +88,31 @@ class SimpleDataset(Dataset):
 def dataset(x, y):
     return SimpleDataset(x, y)
 
-def bytes_as_file(bytes):
+def bytes_as_file(bytes: bytes) -> BytesIO:
     memfile = BytesIO()
     memfile.write(bytes)
     memfile.seek(0)
     return memfile
 
-def image_from_bytes(bytes):
+def image_from_bytes(bytes: bytes) -> np.ndarray:
     return cv2.imdecode(np.frombuffer(bytes, np.uint8), cv2.IMREAD_COLOR)
 
-def serialize_array(ndarray):
+def serialize_array(ndarray: np.ndarray) -> bytes:
     memfile = BytesIO()
     np.save(memfile, ndarray)
     return memfile.getvalue()
 
-def deserialize_array(bytes):
+def deserialize_array(bytes: bytes) -> np.ndarray:
     memfile = bytes_as_file(bytes)
-    return np.load(memfile)
+    return np.load(memfile, allow_pickle=True)
+
+def serialize_values(values) -> bytes:
+    memfile = BytesIO()
+    for value in values:
+        memfile.write(value)
+    return memfile.getvalue()
+
+def deserialize_values(bytes: bytes, count: int, dtype):
+    memfile = bytes_as_file(bytes)
+    values = [int.from_bytes(memfile.read(np.dtype(dtype).itemsize), "big") for _ in range(count)]
+    return np.array(values, dtype=dtype)

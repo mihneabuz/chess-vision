@@ -8,7 +8,7 @@ import cv2
 from board_detection import Service as BoardDetection
 from piece_classification import Service as PieceClassification
 from utils.process import crop_board, crop_pieces
-from utils.utils import deserialize_array, image_from_bytes
+from utils.utils import deserialize_array, serialize_array, deserialize_values, image_from_bytes
 
 size = 160
 
@@ -47,7 +47,7 @@ def print_board(pieces):
         print(GRAY + '----------------------------------' + END)
         for j in range(8):
             print(GRAY + '|' + END, end=' ')
-            print(pieces_map[found[i * 8 + j]], end=' ')
+            print(pieces_map[pieces[i * 8 + j]], end=' ')
         print(GRAY + '|' + END)
     print(GRAY + '----------------------------------' + END)
 
@@ -73,14 +73,13 @@ if __name__ == '__main__':
 
     input1 = (image_bytes, bytes())
     result1 = board_detection.process([input1, input1])
-    print('output board_detection', result1)
 
     corners = stack_corners(deserialize_array(result1[0]))
     print(corners)
 
     #  DELETE:
     import json
-    corners = json.load(open('boards/data/17.json'))['corners']
+    corners = json.load(open(file.replace('jpg', 'json')))['corners']
     result1[0] = [max([x, 0]) for x in result1[0]]
 
     plt.imshow(add_corners(image, corners))
@@ -97,9 +96,10 @@ if __name__ == '__main__':
     plt.tight_layout()
     plt.show()
 
-    input2 = (image_bytes, unstack_corners(corners))
+    input2 = (image_bytes, serialize_array(np.array(unstack_corners(corners)).astype(np.float32)))
     result2 = piece_classification.process([input2, input2])
-    found = deserialize_array(result2[0])
+
+    found = deserialize_values(result2[0], 64, np.uint8)
     print_board(found)
 
     plt.imshow(cropped)

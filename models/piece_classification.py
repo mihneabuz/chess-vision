@@ -1,13 +1,15 @@
+import numpy as np
 import torch
 from torchvision import models, transforms
 from torch.utils.data import DataLoader, random_split
 import matplotlib.pyplot as plt
 from collections import Counter
 from random import randint
+import json
 
 from utils.load_data import load_data
 from utils.process import crop_board, crop_pieces
-from utils.utils import classes_dict, image_from_bytes, bytes_as_file, serialize_array, num_classes, get_device, train_loop, validation_metrics, summary, dataset
+from utils.utils import classes_dict, image_from_bytes, bytes_as_file, serialize_array, deserialize_array, num_classes, get_device, serialize_values, train_loop, validation_metrics, summary, dataset
 import service as service
 
 normalize = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
@@ -163,20 +165,16 @@ class Service(service.Service):
 
     def _transform_in(self, input):
         image = image_from_bytes(input[0])
-        corners = [
-            [input[1][0], input[1][1]],
-            [input[1][2], input[1][3]],
-            [input[1][4], input[1][5]],
-            [input[1][6], input[1][7]],
-        ]
-        pieces, _ = crop_pieces(crop_board(image, corners))
+        corners = deserialize_array(input[1])
+        pieces, _ = crop_pieces(crop_board(image, np.array_split(corners, 4)))
         return torch.stack([jit_transform(tensor_transform(piece)) for piece in pieces])
 
     def _transform_out(self, result):
-        return serialize_array(result.detach().numpy())
+        preds = result.detach().numpy().astype(np.uint8)
+        return serialize_values(preds)
 
     def _process_batch(self, data):
         return torch.argmax(self.model(torch.concat(data)), 1).split(64)
 
 if __name__ == "__main__":
-    train(4, batch_size=32, limit=-1, load_dict=False)
+    train(6, batch_size=32, limit=-1, load_dict=False)
