@@ -67,6 +67,8 @@ pub async fn publisher(conn: &Connection, mut receiver: UnboundedReceiver<Messag
         .queue_declare(&message_queue, QueueDeclareOptions::default(), FieldTable::default())
         .await?;
 
+    println!("declared queue {}", message_queue);
+
     loop {
         let message = receiver.recv().await.unwrap();
         let payload = serde_json::to_vec(&message).unwrap();

@@ -62,8 +62,8 @@ async fn main() -> Result<()> {
         }
     });
 
-    let h1 = tokio::spawn(consumer(conn, consume_sender));
     let h2 = tokio::spawn(publisher(conn, publish_receiver));
+    let h1 = tokio::spawn(consumer(conn, consume_sender));
 
     join! { h1, h2, worker };
 
