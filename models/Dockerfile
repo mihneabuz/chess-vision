@@ -5,7 +5,7 @@ RUN apt install -y libgl1
 
 WORKDIR /model
 
-COPY requirements.txt .
+COPY requirements.docker.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .

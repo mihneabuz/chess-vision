@@ -2,7 +2,7 @@ version: "3.1"
 services:
 
   web-frontend:
-    container_name: web-frontend
+    container_name: web
     build:
       dockerfile: Dockerfile
       context: ./web
