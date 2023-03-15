@@ -81,6 +81,17 @@ services:
       - rabbitmq
       - file-server
 
+  results:
+    container_name: results
+    build:
+      dockerfile: Dockerfile
+      context: ./results
+    environment:
+      MESSAGE_BROKER: rabbitmq
+      QUEUE: stage3
+    links:
+      - rabbitmq
+
 volumes:
   file-storage:
   rabbit-storage:

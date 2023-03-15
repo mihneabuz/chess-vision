@@ -1,8 +1,6 @@
-use std::pin::Pin;
 use std::sync::mpsc::Sender;
 
 use bytes::Bytes;
-use futures::Future;
 use futures::stream::StreamExt;
 use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
 use lapin::{options::BasicConsumeOptions, types::FieldTable, Connection};
