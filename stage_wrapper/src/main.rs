@@ -6,7 +6,7 @@ mod wrapper;
 use bytes::Bytes;
 use futures::join;
 use lapin::Result;
-use message::{consumer, publisher, connect, Message};
+use message::{connect, consumer, publisher, Message};
 
 use crate::file::fetch_file_sync;
 

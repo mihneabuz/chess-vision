@@ -7,17 +7,34 @@ use futures::StreamExt;
 use lapin::options::{BasicConsumeOptions, QueueDeclareOptions};
 use lapin::types::FieldTable;
 use lapin::{Connection, ConnectionProperties, Consumer, Result};
+use serde::{Deserialize, Serialize};
 use tokio_retry::Retry;
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct Message {
+    pub id: String,
+    pub hash: String,
+    #[serde(with = "serde_bytes")]
+    pub data: Vec<u8>,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let map: HashMap<String, [u8; 64]> = HashMap::new();
-    let results = RwLock::new(Arc::new(map));
+    let results = Arc::new(RwLock::new(map));
 
     let mut consumer = get_consumer().await?;
 
     while let Some(delivery) = consumer.next().await {
-        println!("{:?}", delivery);
+        if let Ok(parsed) = delivery.map(|d| serde_json::from_slice::<Message>(&d.data)) {
+            if let Ok(message) = parsed {
+                results
+                    .write()
+                    .unwrap()
+                    .insert(message.id, message.data.try_into().unwrap())
+                    .unwrap();
+            }
+        }
     }
 
     Ok(())

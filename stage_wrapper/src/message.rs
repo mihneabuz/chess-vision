@@ -30,11 +30,10 @@ pub async fn connect() -> Result<Connection> {
 }
 
 pub async fn consumer(conn: &Connection, sender: Sender<(Message, Bytes)>) -> Result<()> {
-    let channel = conn.create_channel().await?;
-
     let message_queue = utils::current_queue();
     let mut consumer = Retry::spawn(utils::retry_strategy(), || async {
-        channel
+        conn.create_channel()
+            .await?
             .basic_consume(
                 &message_queue,
                 "service",
