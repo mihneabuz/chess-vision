@@ -4,9 +4,10 @@ use bytes::Bytes;
 use futures::stream::StreamExt;
 use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
 use lapin::{options::BasicConsumeOptions, types::FieldTable, Connection};
-use lapin::{BasicProperties, Result};
+use lapin::{BasicProperties, ConnectionProperties, Result};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedReceiver;
+use tokio_retry::Retry;
 
 use crate::utils;
 
@@ -24,12 +25,16 @@ impl Message {
     }
 }
 
+pub async fn connect() -> Result<Connection> {
+    Connection::connect(&utils::amqp_addr(), ConnectionProperties::default()).await
+}
+
 pub async fn consumer(conn: &Connection, sender: Sender<(Message, Bytes)>) -> Result<()> {
     let channel = conn.create_channel().await?;
 
     let message_queue = utils::current_queue();
-    let mut consumer = loop {
-        if let Ok(consumer) = channel
+    let mut consumer = Retry::spawn(utils::retry_strategy(), || async {
+        channel
             .basic_consume(
                 &message_queue,
                 "service",
@@ -37,10 +42,8 @@ pub async fn consumer(conn: &Connection, sender: Sender<(Message, Bytes)>) -> Re
                 FieldTable::default(),
             )
             .await
-        {
-            break consumer;
-        }
-    };
+    })
+    .await?;
 
     while let Some(delivery) = consumer.next().await {
         if let Ok(delivery) = delivery {

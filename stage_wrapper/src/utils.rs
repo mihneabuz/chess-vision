@@ -1,4 +1,8 @@
 use std::env;
+use std::iter::Map;
+use std::time::Duration;
+
+use tokio_retry::strategy::{ExponentialBackoff, jitter};
 
 pub fn service_type() -> String {
     env::var("SERVICE_TYPE").expect("SERVICE_TYPE variable not set")
@@ -30,4 +34,8 @@ pub fn file_server() -> String {
 
 pub fn file_server_token() -> String {
     env::var("FILE_SERVER_TOKEN").unwrap_or(String::from(""))
+}
+
+pub fn retry_strategy() -> Map<ExponentialBackoff, fn(Duration) -> Duration> {
+    ExponentialBackoff::from_millis(10).map(jitter)
 }

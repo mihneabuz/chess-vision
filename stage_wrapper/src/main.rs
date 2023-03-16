@@ -5,23 +5,18 @@ mod wrapper;
 
 use bytes::Bytes;
 use futures::join;
-use lapin::{Connection, ConnectionProperties, Result};
-use message::{consumer, publisher, Message};
+use lapin::Result;
+use message::{consumer, publisher, connect, Message};
 
 use crate::file::fetch_file_sync;
+
+use tokio_retry::Retry;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     println!("starting stage {:?}", utils::model_name());
 
-    let conn = loop {
-        let conn = Connection::connect(&utils::amqp_addr(), ConnectionProperties::default()).await;
-        if let Ok(conn) = conn {
-            break Box::leak(Box::new(conn));
-        }
-
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-    };
+    let conn = Box::leak(Box::new(Retry::spawn(utils::retry_strategy(), connect).await?));
 
     println!("connected to message queue");
 
