@@ -16,14 +16,13 @@ services:
     links:
       - file-server
       - rabbitmq
+      - results
 
   file-server:
     container_name: file-server
     image: mayth/simple-upload-server:latest
     volumes:
       - file-storage:/var/root
-    ports:
-      - 3001:80
     command: -token ${FILE_SERVER_TOKEN} -port 80 -upload_limit 400000000 /var/root
 
   weights-up:
@@ -45,7 +44,7 @@ services:
       - rabbit-storage:/var/lib/rabbitmq/
       - rabbit-logs:/var/log/rabbitmq
 
-  board_det:
+  board_detection:
     container_name: board_det
     build:
       dockerfile: Dockerfile
@@ -63,7 +62,7 @@ services:
       - rabbitmq
       - file-server
 
-  piece_class:
+  piece_classification:
     container_name: piece_class
     build:
       dockerfile: Dockerfile
@@ -89,6 +88,8 @@ services:
     environment:
       MESSAGE_BROKER: rabbitmq
       QUEUE: stage3
+    ports:
+      - 3000:80
     links:
       - rabbitmq
 

@@ -23,7 +23,7 @@ export default function Home() {
   useEffect(() => {
     if (state.type === 'waiting') {
       const interval = setInterval(async () => {
-        const req = await fetch('/api/check');
+        const req = await fetch(`/api/check/${state.id}`);
         const result = await req.json();
 
         if (result.success) {

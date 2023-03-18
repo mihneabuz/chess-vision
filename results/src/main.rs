@@ -1,7 +1,12 @@
 mod utils;
 
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
+
+use axum::extract::{Path, State};
+use axum::routing::get;
+use axum::{Json, Router, Server};
 
 use futures::StreamExt;
 use lapin::options::{BasicConsumeOptions, QueueDeclareOptions};
@@ -10,7 +15,7 @@ use lapin::{Connection, ConnectionProperties, Consumer, Result};
 use serde::{Deserialize, Serialize};
 use tokio_retry::Retry;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct Message {
     pub id: String,
     pub hash: String,
@@ -18,26 +23,59 @@ pub struct Message {
     pub data: Vec<u8>,
 }
 
+#[derive(Serialize, Debug)]
+pub struct Response {
+    pub success: bool,
+    #[serde(with = "serde_bytes")]
+    pub pieces: Option<Vec<u8>>,
+}
+
+type Results = Arc<RwLock<HashMap<String, [u8; 64]>>>;
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    let map: HashMap<String, [u8; 64]> = HashMap::new();
-    let results = Arc::new(RwLock::new(map));
+    let results: Results = Arc::new(RwLock::new(HashMap::new()));
 
-    let mut consumer = get_consumer().await?;
+    let results_ref = Arc::clone(&results);
+    tokio::spawn(async move {
+        let mut consumer = get_consumer().await.expect("Could not connect to final stage");
 
-    while let Some(delivery) = consumer.next().await {
-        if let Ok(parsed) = delivery.map(|d| serde_json::from_slice::<Message>(&d.data)) {
-            if let Ok(message) = parsed {
-                results
-                    .write()
-                    .unwrap()
-                    .insert(message.id, message.data.try_into().unwrap())
-                    .unwrap();
+        while let Some(delivery) = consumer.next().await {
+            if let Ok(parsed) = delivery.map(|d| serde_json::from_slice::<Message>(&d.data)) {
+                if let Ok(message) = parsed {
+                    results_ref
+                        .write()
+                        .unwrap()
+                        .insert(message.id, message.data.try_into().unwrap());
+                }
             }
         }
-    }
+    });
+
+    let app = Router::new()
+        .route("/running", get(|| async { "yes" }))
+        .route("/:id", get(root))
+        .with_state(results);
+
+    Server::bind(&SocketAddr::from(([0, 0, 0, 0], 80)))
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 
     Ok(())
+}
+
+async fn root(State(results): State<Results>, Path(id): Path<String>) -> Json<Response> {
+    match results.read().unwrap().get(&id) {
+        Some(result) => Json(Response {
+            success: true,
+            pieces: Some(result.clone().try_into().unwrap()),
+        }),
+        None => Json(Response {
+            success: false,
+            pieces: None,
+        }),
+    }
 }
 
 async fn get_consumer() -> Result<Consumer> {
