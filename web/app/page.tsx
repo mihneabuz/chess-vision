@@ -40,10 +40,29 @@ export default function Home() {
   };
 
   return (
-    <div className="grid h-full place-items-center">
-      <Upload onUpload={handleUpload} canUpload={state.type === 'upload'}/>
-      <Progress message={'Processing'} hidden={state.type !== 'waiting'}/>
-      <Result pieces={state.type === 'result' ? state.pieces : []} hidden={state.type !== 'result'}/>
+    <div className="w-full flex flex-wrap items-center justify-center">
+      <div className="flex-grow bg-red-700 h-fit min-w-fit">
+        <Upload onUpload={handleUpload} canUpload={state.type === 'upload'} />
+      </div>
+
+      <div className="flex-grow bg-green-800 h-fit min-w-fit">
+      {
+        state.type === 'upload' &&
+          <div className="text-center w-full">
+            Take a picture of your game and we'll tell you what to play
+          </div>
+      }
+
+      {
+        state.type === 'waiting' &&
+          <Progress message={'Processing'}/>
+      }
+
+      {
+        state.type === 'result' &&
+        <Result pieces={state.type === 'result' ? state.pieces : []} />
+      }
+      </div>
     </div>
   );
 }
@@ -87,7 +106,7 @@ function Upload({ onUpload, canUpload }) {
   return (
     <form className="flex flex-col items-center">
       <input type="file" accept="image/*" onChange={handleChange} disabled={!canUpload}/>
-      <img className="aspect-auto w-3/4" ref={imagePreview} />
+      <img className="aspect-auto" ref={imagePreview} />
       <button onClick={handleClick} disabled={!canUpload || imageFile === null}>
         Upload image
       </button>
@@ -95,17 +114,17 @@ function Upload({ onUpload, canUpload }) {
   )
 }
 
-function Progress({ message, hidden }) {
+function Progress({ message }) {
   return (
-    <div hidden={hidden}>
+    <div>
       <span>{message}</span>
     </div>
   );
 }
 
-function Result({ pieces, hidden }) {
+function Result({ pieces }) {
   return (
-    <div hidden={hidden}>
+    <div>
       <span>{pieces}</span>
     </div>
   );
