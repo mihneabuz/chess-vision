@@ -8,7 +8,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head />
-      <body className={`bg-gradient-to-br from-cyan-500 to-indigo-500 ${fontClass}`}>
+      <body className={`bg-gradient-to-br from-kashmir-500 to-kashmir-700 ${fontClass}`}>
         <div className="flex h-full flex-col">
           <Nav />
           {children}
