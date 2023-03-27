@@ -1,19 +1,20 @@
 'use client';
 
-import { MouseEventHandler, ChangeEventHandler, useEffect } from 'react';
-import { useRef, useState } from 'react';
+import { MouseEventHandler, ChangeEventHandler, useEffect, useMemo } from 'react';
+import { useState } from 'react';
+import { useEaseIn } from './hooks';
 
 interface Upload {
-  type: 'upload'
-};
+  type: 'upload';
+}
 interface Waiting {
-  type: 'waiting',
-  id: string
-};
+  type: 'waiting';
+  id: string;
+}
 interface Result {
-  type: 'result',
-  pieces: number[]
-};
+  type: 'result';
+  pieces: number[];
+}
 
 type State = Upload | Waiting | Result;
 
@@ -40,35 +41,51 @@ export default function Home() {
   };
 
   return (
-    <div className="w-full flex flex-wrap items-center justify-center">
-      <div className="flex-grow bg-red-700 h-fit min-w-fit">
+    <div className="flex w-full flex-wrap items-center justify-center gap-8 p-8">
+      <div className="h-fit max-w-2xl grow bg-red-700">
         <Upload onUpload={handleUpload} canUpload={state.type === 'upload'} />
       </div>
 
-      <div className="flex-grow bg-green-800 h-fit min-w-fit">
-      {
-        state.type === 'upload' &&
-          <div className="text-center w-full">
-            Take a picture of your game and we'll tell you what to play
-          </div>
-      }
+      <div className="grow ">
+        {state.type === 'upload' && <Greeting />}
 
-      {
-        state.type === 'waiting' &&
-          <Progress message={'Processing'}/>
-      }
+        {state.type === 'waiting' && <Progress message={'Processing'} />}
 
-      {
-        state.type === 'result' &&
-        <Result pieces={state.type === 'result' ? state.pieces : []} />
-      }
+        {state.type === 'result' && <Result pieces={state.type === 'result' ? state.pieces : []} />}
       </div>
+    </div>
+  );
+}
+
+function Greeting() {
+  const text1 = useEaseIn<HTMLSpanElement>(200);
+  const text2 = useEaseIn<HTMLSpanElement>(2000);
+  const emoji = useEaseIn<HTMLSpanElement>(3000);
+
+  return (
+    <div className="flex flex-row items-center justify-center">
+      <div className="inline-block text-center">
+        <span className="pl-20 transition-opacity duration-600 opacity-0" ref={text1}>
+          Take a picture of your game... <br/>
+        </span>
+        <span className="pl-20 transition-opacity duration-600 opacity-0" ref={text2}>
+          ...and we'll tell you what to play!
+        </span>
+      </div>
+      <span className="pl-4 text-5xl transition-opacity duration-600 opacity-0" ref={emoji}>
+        😎
+      </span>
     </div>
   );
 }
 
 function Upload({ onUpload, canUpload }) {
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const imagePreview = useMemo(() => {
+    if (imageFile === null) return null;
+
+    return URL.createObjectURL(imageFile);
+  }, [imageFile]);
 
   const handleClick: MouseEventHandler<HTMLButtonElement> = async (e) => {
     e.preventDefault();
@@ -79,7 +96,7 @@ function Upload({ onUpload, canUpload }) {
 
       const req = await fetch('/api/upload', {
         method: 'POST',
-        body: formData
+        body: formData,
       });
 
       const result = await req.json();
@@ -95,23 +112,31 @@ function Upload({ onUpload, canUpload }) {
 
     const file = e.target.files?.item(0);
     setImageFile(file || null);
-
-    if (file && imagePreview.current) {
-      imagePreview.current.src = URL.createObjectURL(file);
-    }
   };
-
-  const imagePreview = useRef<HTMLImageElement>(null);
 
   return (
     <form className="flex flex-col items-center">
-      <input type="file" accept="image/*" onChange={handleChange} disabled={!canUpload}/>
-      <img className="aspect-auto" ref={imagePreview} />
-      <button onClick={handleClick} disabled={!canUpload || imageFile === null}>
-        Upload image
-      </button>
+      <input
+        className="rounded bg-kashmir-800 py-1 px-4 hover:bg-kashmir-700"
+        type="file"
+        accept="image/*"
+        onChange={handleChange}
+        disabled={!canUpload}
+      />
+
+      {imagePreview !== null && <img className="my-8 aspect-auto" src={imagePreview} />}
+
+      {imageFile !== null && (
+        <button
+          className="rounded bg-kashmir-800 py-1 px-4 hover:bg-kashmir-700"
+          onClick={handleClick}
+          disabled={!canUpload || imageFile === null}
+        >
+          Upload image
+        </button>
+      )}
     </form>
-  )
+  );
 }
 
 function Progress({ message }) {
