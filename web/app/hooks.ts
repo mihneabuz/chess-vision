@@ -1,5 +1,6 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { setTimeout } from 'timers';
+import { sounds } from './pieces/util';
 
 export function useEaseIn<T extends HTMLElement>(after: number) {
   const ref = useRef<T>(null);
@@ -14,4 +15,8 @@ export function useEaseIn<T extends HTMLElement>(after: number) {
   });
 
   return ref;
+}
+
+export function useSounds() {
+  return useMemo(() => sounds(), []);
 }

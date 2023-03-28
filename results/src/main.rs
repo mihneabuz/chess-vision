@@ -9,7 +9,7 @@ use axum::routing::get;
 use axum::{Json, Router, Server};
 
 use futures::StreamExt;
-use lapin::options::{BasicConsumeOptions, QueueDeclareOptions};
+use lapin::options::BasicConsumeOptions;
 use lapin::types::FieldTable;
 use lapin::{Connection, ConnectionProperties, Consumer, Result};
 use serde::{Deserialize, Serialize};
@@ -41,13 +41,11 @@ async fn main() -> Result<()> {
         let mut consumer = get_consumer().await.expect("Could not connect to final stage");
 
         while let Some(delivery) = consumer.next().await {
-            if let Ok(parsed) = delivery.map(|d| serde_json::from_slice::<Message>(&d.data)) {
-                if let Ok(message) = parsed {
-                    results_ref
-                        .write()
-                        .unwrap()
-                        .insert(message.id, message.data.try_into().unwrap());
-                }
+            if let Ok(Ok(message)) = delivery.map(|d| serde_json::from_slice::<Message>(&d.data)) {
+                results_ref
+                    .write()
+                    .unwrap()
+                    .insert(message.id, message.data.try_into().unwrap());
             }
         }
     });
@@ -86,15 +84,12 @@ async fn get_consumer() -> Result<Consumer> {
     })
     .await?;
 
-    let channel = conn.create_channel().await?;
     println!("connected to message queue");
 
     let message_queue = utils::queue();
-    let (opts, table) = (QueueDeclareOptions::default(), FieldTable::default());
-    channel.queue_declare(&message_queue, opts, table.clone()).await?;
-
-    let opts = BasicConsumeOptions::default();
+    let (opts, table) = (BasicConsumeOptions::default(), FieldTable::default());
     let consumer = Retry::spawn(retry_strategy, || async {
+        let channel = conn.create_channel().await?;
         channel.basic_consume(&message_queue, "service", opts, table.clone()).await
     })
     .await?;

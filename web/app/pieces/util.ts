@@ -16,9 +16,7 @@ import black_queen from './svg/black_queen.svg';
 import white_king from './svg/white_king.svg';
 import black_king from './svg/black_king.svg';
 
-const pieces = new Map<number, string>();
-
-pieces.set(0, "");
+export const pieces = new Map();
 
 pieces.set(1, white_pawn);
 pieces.set(2, black_pawn);
@@ -38,14 +36,19 @@ pieces.set(10, black_queen);
 pieces.set(11, white_king);
 pieces.set(12, black_king);
 
-import thock1 from './sounds/thock1.mp3';
-import thock2 from './sounds/thock2.mp3';
-import thack from './sounds/thack.mp3';
+export const startPosition = [
+  8, 6, 4, 10, 12, 4, 6, 8,
+  2, 2, 2, 2, 2, 2, 2, 2,
+  0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0,
+  1, 1, 1, 1, 1, 1, 1, 1,
+  7, 5, 3, 9, 11, 3, 5, 7
+];
 
-const sounds = {
-  thock1: new Audio(thock1),
-  thock2: new Audio(thock2),
-  thack: new Audio(thack)
-};
-
-export default { pieces, sounds };
+export const sounds = () => ({
+  thock1: new Audio('/sounds/thock1.mp3'),
+  thock2: new Audio('/sounds/thock2.mp3'),
+  thack: new Audio('/sounds/thack.mp3'),
+});

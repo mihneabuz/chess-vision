@@ -49,7 +49,7 @@ export async function publishFile(file: File) {
     throw new Error('Could not send file to server: ' + responseString);
   }
 
-  const hash = await md5(Buffer.from(await file.arrayBuffer()));
+  const hash = md5(Buffer.from(await file.arrayBuffer()));
   await publishId(id, hash);
 
   return id;
