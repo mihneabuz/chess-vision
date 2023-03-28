@@ -10,7 +10,7 @@ from utils.load_data import load_data
 from utils.utils import get_device, train_loop, dataset, serialize_array, bytes_as_file, image_from_bytes
 import service as service
 
-size = 160
+size = 224
 
 def tensor_transform(image):
     resized = cv2.resize(image, (size, size))
@@ -59,7 +59,7 @@ def inference():
     model.eval()
     return lambda img: model(jit_transform(tensor_transform(img))[None, :, :, :]).detach().numpy()
 
-def loss_func(predicted, real):
+def old_loss_func(predicted, real):
     grouped1 = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
     grouped2 = torch.stack((predicted[:, 6:8], predicted[:, 4:6], predicted[:, 2:4], predicted[:, 0:2]), 1)
 
@@ -67,6 +67,10 @@ def loss_func(predicted, real):
     dists2 = (grouped2 - real).pow(2).sum(2).sqrt().sum(1)
 
     return torch.min(dists1, dists2).sum()
+
+def loss_func(predicted, real):
+    grouped = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
+    return (grouped - real).pow(2).sum(2).sqrt().sum(1).sum()
 
 def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
     device = get_device()
@@ -168,4 +172,4 @@ class Service(service.Service):
         return self.model(torch.stack(data)).detach().numpy()
 
 if __name__ == '__main__':
-    train(20, lr=0.0001, batch_size=20, load_dict=False)
+    train(30, lr=0.00002, batch_size=16, load_dict=False)

@@ -9,7 +9,6 @@ from board_detection import Service as BoardDetection
 from piece_classification import Service as PieceClassification
 from utils.process import crop_board, crop_pieces
 from utils.utils import deserialize_array, serialize_array, deserialize_values, image_from_bytes
-from utils.load_data import sort_corners
 
 size = 160
 
@@ -78,11 +77,10 @@ if __name__ == '__main__':
     corners = stack_corners(deserialize_array(result1[0]))
     print(corners)
 
-    #  DELETE:
-    import json
-    corners = json.load(open(file.replace('jpg', 'json')))['corners']
-    """ result1[0] = [max([x, 0]) for x in result1[0]] """
-    corners = sort_corners(corners)
+    """ import json """
+    """ from utils.load_data import sort_corners """
+    """ corners = sort_corners(json.load(open(file.replace('jpg', 'json'))))['corners'] """
+
     plt.imshow(add_corners(image, corners))
     plt.show()
 
@@ -98,6 +96,7 @@ if __name__ == '__main__':
     result2 = piece_classification.process([input2, input2])
 
     found = deserialize_values(result2[0], 64, np.uint8)
+    print(found)
     print_board(found)
 
     plt.imshow(cropped)

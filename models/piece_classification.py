@@ -5,11 +5,10 @@ from torch.utils.data import DataLoader, random_split
 import matplotlib.pyplot as plt
 from collections import Counter
 from random import randint
-import json
 
 from utils.load_data import load_data
 from utils.process import crop_board, crop_pieces
-from utils.utils import classes_dict, image_from_bytes, bytes_as_file, serialize_array, deserialize_array, num_classes, get_device, serialize_values, train_loop, validation_metrics, summary, dataset
+from utils.utils import classes_dict, image_from_bytes, bytes_as_file, deserialize_array, num_classes, get_device, serialize_values, train_loop, validation_metrics, summary, dataset
 import service as service
 
 normalize = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
@@ -58,7 +57,7 @@ def load_datasets(limit=-1, balance=True):
 
     if balance:
         avg_count = sum([counts[label] for label in classes_dict if label != 'empty']) // 10
-        drop_chance = avg_count * 100 // counts['empty']
+        drop_chance = avg_count * 150 // counts['empty']
         dropped = 0
 
         balanced_pieces_images = []
