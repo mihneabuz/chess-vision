@@ -168,4 +168,4 @@ class Service(service.Service):
         return self.model(torch.stack(data)).detach().numpy()
 
 if __name__ == '__main__':
-    train(20, lr=0.0001, batch_size=20, load_dict=True)
+    train(20, lr=0.0001, batch_size=20, load_dict=False)

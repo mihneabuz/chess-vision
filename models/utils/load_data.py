@@ -25,7 +25,30 @@ def load_data(max=-1):
     for file in tqdm(files, desc='loading images'):
         image = cv2.imread(DATA + '/' + file + '.jpg')
         annotations = json.load(open(DATA + '/' + file + '.json'))
+        annotations['corners'] = sort_corners(annotations['corners'])
         yield image, annotations
+
+
+def sort_corners(corners):
+    def cost(c):
+        return \
+            (c[0][0] + c[0][1]) + \
+            (c[1][0] + c[1][1]) * 2 + \
+            (c[2][0] + c[2][1]) * 4 + \
+            (c[3][0] + c[3][1]) * 8
+
+    def shift(c):
+        return [c[2], c[0], c[3], c[1]]
+
+    best = corners.copy()
+    best_cost = cost(best)
+    for _ in range(4):
+        corners = shift(corners)
+        if cost(corners) < best_cost:
+            best = corners.copy()
+            best_cost = cost(best)
+
+    return best
 
 
 if __name__ == "__main__":
