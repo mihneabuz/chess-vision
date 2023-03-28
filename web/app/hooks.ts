@@ -7,7 +7,7 @@ export function useEaseIn<T extends HTMLElement>(after: number) {
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (ref.current) {
-        ref.current.style.opacity = "100%";
+        ref.current.style.opacity = '100%';
       }
     }, after);
 

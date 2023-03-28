@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useSounds } from 'app/hooks';
 import { pieces, startPosition } from 'app/pieces/util';
 
-
 export default function Board({ initial }) {
   const [pieces, setPieces] = useState<number[]>(initial || startPosition);
   const sounds = useSounds();
@@ -14,7 +13,7 @@ export default function Board({ initial }) {
   };
 
   return (
-    <div className="grid grid-cols-8 border-4 border-kashmir-800 rounded">
+    <div className="grid grid-cols-8 rounded border-4 border-kashmir-800">
       {pieces.map((type, index) => (
         <Piece key={`p${index}`} index={index} type={type} onClick={handleClick} />
       ))}
@@ -28,13 +27,12 @@ function Piece({ index, type, onClick }) {
 
   return (
     <div
-      className={`min-w-[4rem] aspect-square flex items-center justify-center ${color}`}
+      className={`flex aspect-square min-w-[4rem] items-center justify-center ${color}`}
       onClick={() => onClick(index)}
     >
-      {
-        piece
-          ? <img className="w-full opacity-80" src={piece.src} />
-          : <div className="border-none"/>
+      {piece
+        ? <img className="w-full opacity-80" src={piece.src} />
+        : <div className="border-none" />
       }
     </div>
   );

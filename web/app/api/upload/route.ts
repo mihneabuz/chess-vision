@@ -20,6 +20,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   return NextResponse.json({
     success: id ? true : false,
-    id
+    id,
   });
 }

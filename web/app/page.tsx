@@ -42,12 +42,12 @@ export default function Home() {
   };
 
   return (
-    <div className="h-full flex w-full flex-wrap items-center justify-around gap-12 p-8">
-      <div className="max-w-2xl grow shrink">
+    <div className="flex min-h-[64rem] flex-wrap items-center justify-around gap-12 p-8">
+      <div className="max-w-2xl shrink grow">
         <Upload onUpload={handleUpload} canUpload={state.type !== 'waiting'} />
       </div>
 
-      <div className="max-w-2xl grow shrink">
+      <div className="max-w-2xl shrink grow">
         {state.type === 'upload' && <Greeting />}
 
         {state.type === 'waiting' && <Progress message={'Processing'} />}
@@ -66,14 +66,14 @@ function Greeting() {
   return (
     <div className="flex flex-row items-center justify-center text-xl">
       <div className="inline-block text-center">
-        <span className="transition-opacity duration-700 opacity-0" ref={text1}>
+        <span className="opacity-0 transition-opacity duration-700" ref={text1}>
           Take a picture of your game... <br />
         </span>
-        <span className="pl-20 transition-opacity duration-700 opacity-0" ref={text2}>
+        <span className="pl-20 opacity-0 transition-opacity duration-700" ref={text2}>
           ...and we&apos;ll tell you what to play!
         </span>
       </div>
-      <span className="pl-4 text-6xl transition-opacity duration-1000 opacity-0" ref={emoji}>
+      <span className="pl-4 text-6xl opacity-0 transition-opacity duration-1000" ref={emoji}>
         😎
       </span>
     </div>
@@ -118,19 +118,21 @@ function Upload({ onUpload, canUpload }) {
     <form className="flex flex-col items-center">
       <label
         htmlFor="upload"
-        className="rounded bg-kashmir-800 py-1 px-4 hover:bg-kashmir-700 cursor-pointer"
+        className="cursor-pointer rounded bg-kashmir-800 py-1 px-4 text-xl
+                   transition-transform hover:scale-95 hover:bg-kashmir-700"
       >
         Select image
       </label>
       <input type="file" name="upload" id="upload" className="hidden" onChange={handleChange} />
 
       {imagePreview && (
-        <img className="my-8 aspect-auto border-4 border-kashmir-800 rounded" src={imagePreview} />
+        <img className="my-8 aspect-auto rounded border-4 border-kashmir-800" src={imagePreview} />
       )}
 
       {imageFile && (
         <button
-          className="rounded bg-kashmir-800 py-1 px-4 hover:bg-kashmir-700"
+          className="rounded bg-kashmir-800 py-1 px-4 text-xl
+                     transition-transform hover:scale-95 hover:bg-kashmir-700"
           onClick={handleClick}
           disabled={!canUpload || imageFile === null}
         >
@@ -143,7 +145,7 @@ function Upload({ onUpload, canUpload }) {
 
 function Progress({ message }) {
   return (
-    <div className="flex flex-row justify-center items-center">
+    <div className="flex flex-row items-center justify-center">
       <Spinner />
       <span className="text-2xl">{message}</span>
       <Dots />
@@ -152,7 +154,7 @@ function Progress({ message }) {
 }
 
 function Spinner() {
-  return <div className="w-2 h-12 mx-12 bg-kashmir-100 animate-spin" />;
+  return <div className="mx-12 h-12 w-2 animate-spin bg-kashmir-100" />;
 }
 
 function Dots() {
