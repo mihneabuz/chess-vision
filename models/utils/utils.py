@@ -44,7 +44,7 @@ def train_loop(model, dataloader, optimizer, criterion, transform=lambda x: x):
         pred = model(images)
         loss = criterion(pred, labels)
 
-        losses.append(loss.item())
+        losses.append(loss.item() / len(images))
 
         loss.backward()
         optimizer.step()

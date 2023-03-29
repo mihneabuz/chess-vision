@@ -68,9 +68,14 @@ def old_loss_func(predicted, real):
 
     return torch.min(dists1, dists2).sum()
 
-def loss_func(predicted, real):
+def loss_func_sum(predicted, real):
     grouped = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
     return (grouped - real).pow(2).sum(2).sqrt().sum(1).sum()
+
+def loss_func_max(predicted, real):
+    grouped = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
+    maxss, _ = torch.max((grouped - real).pow(2).sum(2).sqrt(), dim=1)
+    return maxss.sum()
 
 def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
     device = get_device()
@@ -102,8 +107,8 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
 
     model.to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.01)
-    criterion = loss_func
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.1)
+    criterion = loss_func_sum
 
     if epochs > 10:
         set_grad(model.features, False)
@@ -172,4 +177,4 @@ class Service(service.Service):
         return self.model(torch.stack(data)).detach().numpy()
 
 if __name__ == '__main__':
-    train(30, lr=0.00002, batch_size=16, load_dict=False)
+    train(50, lr=0.00001, batch_size=10, load_dict=False, limit=-1)
