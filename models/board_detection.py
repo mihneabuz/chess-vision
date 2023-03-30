@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from utils.load_data import load_data
-from utils.utils import get_device, train_loop, dataset, serialize_array, bytes_as_file, image_from_bytes
+from utils.utils import get_device, train_loop, dataset, serialize_array, bytes_as_file, image_from_bytes, summary
 import service as service
 
 size = 224
@@ -40,24 +40,16 @@ def load_datasets(limit=-1):
 
     return random_split(dataset(images, corners), [train_size, valid_size])
 
-def create_model(pretrained=True):
-    if pretrained:
-        model = models.efficientnet_v2_m(weights=models.EfficientNet_V2_M_Weights.IMAGENET1K_V1)
-    else:
-        model = models.efficientnet_v2_m()
+def create_model():
+    model = models.efficientnet_v2_m(weights=models.EfficientNet_V2_M_Weights.IMAGENET1K_V1)
     last_layer_size = model.classifier[-1].__getattribute__('out_features')
     model.classifier.append(torch.nn.Linear(in_features=last_layer_size, out_features=8))
     return model
 
 def load_model():
-    model = create_model(pretrained=False)
+    model = create_model()
     model.load_state_dict(torch.load('./board_detection_weights'))
     return model
-
-def inference():
-    model = load_model()
-    model.eval()
-    return lambda img: model(jit_transform(tensor_transform(img))[None, :, :, :]).detach().numpy()
 
 def old_loss_func(predicted, real):
     grouped1 = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
@@ -76,6 +68,11 @@ def loss_func_max(predicted, real):
     grouped = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
     maxss, _ = torch.max((grouped - real).pow(2).sum(2).sqrt(), dim=1)
     return maxss.sum()
+
+def loss_func_sum_diag(predicted, real):
+    grouped = torch.stack((predicted[:, 0:2], predicted[:, 6:8]), 1)
+    real = torch.stack((real[:, 0], real[:, 3]), 1)
+    return (grouped - real).pow(2).sum(2).sqrt().sum(1).sum()
 
 def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
     device = get_device()
@@ -103,9 +100,10 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
     if load_dict:
         model = load_model()
     else:
-        model = create_model(pretrained=True)
+        model = create_model()
 
     model.to(device)
+    summary(model, (3, size, size))
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.1)
     criterion = loss_func_sum
@@ -161,7 +159,7 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
 class Service(service.Service):
     def __init__(self):
         self.name = 'board_detection'
-        self.model = create_model(pretrained=False);
+        self.model = create_model();
 
     def load_model(self, data):
         self.model.load_state_dict(torch.load(bytes_as_file(data), map_location=torch.device('cpu')))
