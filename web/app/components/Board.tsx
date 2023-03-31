@@ -21,6 +21,20 @@ export default function Board({ initial }) {
     setPicker(null);
   };
 
+  const handler = async (black: boolean) => {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        pieces,
+        black,
+      }),
+    });
+
+    const data = await res.json();
+
+    console.log(data);
+  };
+
   return (
     <div>
       <div className="grid grid-cols-8 rounded border-4 border-kashmir-800">
@@ -28,6 +42,22 @@ export default function Board({ initial }) {
           <Piece key={`p${index}`} index={index} type={type} onClick={handleClick} />
         ))}
       </div>
+
+      <div className="flex flex-row items-center justify-center gap-8">
+        <button
+          className="flex w-full justify-center rounded transition-colors hover:bg-kashmir-200"
+          onClick={() => handler(false)}
+        >
+          white
+        </button>
+        <button
+          className="flex w-full justify-center rounded transition-colors hover:bg-kashmir-200"
+          onClick={() => handler(true)}
+        >
+          black
+        </button>
+      </div>
+
       <Picker onClick={handlePick} x={picker && picker[0]} y={picker && picker[1]} />
     </div>
   );

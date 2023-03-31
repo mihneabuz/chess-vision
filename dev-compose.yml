@@ -17,6 +17,7 @@ services:
       - file-server
       - rabbitmq
       - results
+      - engine
 
   file-server:
     container_name: file-server
@@ -90,6 +91,16 @@ services:
       QUEUE: stage3
     ports:
       - 3000:80
+    links:
+      - rabbitmq
+
+  engine:
+    container_name: engine
+    build:
+      dockerfile: Dockerfile
+      context: ./engine
+    ports:
+      - 3001:80
     links:
       - rabbitmq
 
