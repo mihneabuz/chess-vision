@@ -3,7 +3,8 @@ use chess::{Board, BoardBuilder, Color, Piece, Square};
 use crate::Request;
 
 pub fn decode(payload: Request) -> Option<String> {
-    if payload.pieces.len() != 64 { return None;
+    if payload.pieces.len() != 64 {
+        return None;
     }
 
     let mut builder = BoardBuilder::new();

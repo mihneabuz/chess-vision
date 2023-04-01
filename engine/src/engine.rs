@@ -1,5 +1,5 @@
-use uci::{self, EngineError};
 use std::env;
+use uci::{self, EngineError};
 
 pub struct Engine {
     inner: uci::Engine,
@@ -7,7 +7,10 @@ pub struct Engine {
 
 impl Engine {
     pub fn new() -> Self {
-        let engine = uci::Engine::new(&env::var("STOCKFISH").unwrap()).unwrap();
+        let engine = uci::Engine::new(&env::var("STOCKFISH").unwrap())
+            .unwrap()
+            .movetime(400);
+
         Self { inner: engine }
     }
 
