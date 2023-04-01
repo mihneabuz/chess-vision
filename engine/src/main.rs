@@ -1,31 +1,56 @@
+mod board;
+mod engine;
+
 use std::io::Result;
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 
+use axum::extract::State;
 use axum::routing::{get, post};
 use axum::{Json, Router, Server};
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug)]
-struct MoveRequest {
+pub struct Request {
     #[serde(with = "serde_bytes")]
-    pieces: Vec<u8>,
-    black: bool,
+    pub pieces: Vec<u8>,
+    pub black: bool,
 }
 
 #[derive(Serialize, Debug)]
-struct MoveResponse {
-    success: bool,
+pub struct Response {
+    pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<String>,
+    pub data: Option<String>,
 }
+
+impl Response {
+    fn error() -> Self {
+        Self {
+            success: false,
+            data: None,
+        }
+    }
+
+    fn from_data(data: Option<String>) -> Self {
+        Self {
+            success: data.is_some(),
+            data,
+        }
+    }
+}
+
+type Engine = Arc<Mutex<engine::Engine>>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let engine = Arc::new(Mutex::new(engine::Engine::new()));
+
     let app = Router::new()
         .route("/running", get(|| async { "yes" }))
         .route("/generate", post(generate))
-        .with_state(());
+        .with_state(engine);
 
     Server::bind(&SocketAddr::from(([0, 0, 0, 0], 80)))
         .serve(app.into_make_service())
@@ -35,21 +60,17 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn generate(Json(payload): Json<MoveRequest>) -> Json<MoveResponse> {
+async fn generate(State(engine): State<Engine>, Json(payload): Json<Request>) -> Json<Response> {
     println!("{:?}", payload);
 
-    if payload.pieces.len() != 64 {
-        return Json(MoveResponse {
-            success: false,
-            data: None,
-        });
-    }
+    let fen = match board::decode(payload) {
+        Some(fen) => fen,
+        None => return Json(Response::error()),
+    };
 
-    Json(MoveResponse {
-        success: false,
-        data: None,
-    })
+    println!("{:?}", fen);
+
+    let data = engine.lock().unwrap().generate(fen).ok();
+
+    Json(Response::from_data(data))
 }
-
-
-

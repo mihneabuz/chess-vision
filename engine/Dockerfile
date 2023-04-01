@@ -1,4 +1,12 @@
-FROM rust:latest AS base
+FROM rust:latest AS rust-stockfish
+
+RUN git clone https://github.com/official-stockfish/Stockfish.git
+WORKDIR Stockfish
+RUN make -C src -j build ARCH=x86-64-modern
+RUN mv src/stockfish /
+WORKDIR /
+
+FROM rust-stockfish as builder
 
 WORKDIR app
 
@@ -12,12 +20,14 @@ RUN cargo build --release
 
 RUN rm -r ./src/*
 
-from base as runner
+from builder as runner
 
 COPY ./src ./src
 
 RUN touch -a -m ./src/main.rs
 
 RUN cargo build --release
+
+ENV STOCKFISH=/stockfish
 
 CMD [ "./target/release/engine" ]

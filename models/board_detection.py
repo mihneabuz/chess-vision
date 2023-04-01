@@ -40,8 +40,11 @@ def load_datasets(limit=-1):
 
     return random_split(dataset(images, corners), [train_size, valid_size])
 
-def create_model():
-    model = models.efficientnet_v2_m(weights=models.EfficientNet_V2_M_Weights.IMAGENET1K_V1)
+def create_model(pretrained=True):
+    if pretrained:
+        model = models.efficientnet_v2_m(weights=models.EfficientNet_V2_M_Weights.IMAGENET1K_V1)
+    else:
+        model = models.efficientnet_v2_m()
     last_layer_size = model.classifier[-1].__getattribute__('out_features')
     model.classifier.append(torch.nn.Linear(in_features=last_layer_size, out_features=8))
     return model
@@ -159,7 +162,7 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
 class Service(service.Service):
     def __init__(self):
         self.name = 'board_detection'
-        self.model = create_model();
+        self.model = create_model(pretrained=False);
 
     def load_model(self, data):
         self.model.load_state_dict(torch.load(bytes_as_file(data), map_location=torch.device('cpu')))
@@ -175,4 +178,4 @@ class Service(service.Service):
         return self.model(torch.stack(data)).detach().numpy()
 
 if __name__ == '__main__':
-    train(50, lr=0.00001, batch_size=10, load_dict=False, limit=-1)
+    train(50, lr=0.00001, batch_size=10, load_dict=True, limit=-1)
