@@ -12,6 +12,7 @@ export default function RootLayout({ children }) {
         <div className="flex flex-col">
           <Banner />
           {children}
+          <div className="h-16"></div>
         </div>
       </body>
     </html>

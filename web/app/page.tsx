@@ -125,9 +125,14 @@ function Upload({ onUpload, canUpload }) {
       </label>
       <input type="file" name="upload" id="upload" className="hidden" onChange={handleChange} />
 
-      {imagePreview && (
-        <img className="my-8 aspect-auto rounded border-4 border-kashmir-800" src={imagePreview} />
-      )}
+      <div className="min-w-[32rem]">
+        {imagePreview && (
+          <img
+            className="my-8 aspect-auto rounded border-4 border-kashmir-800"
+            src={imagePreview}
+          />
+        )}
+      </div>
 
       {imageFile && (
         <button
@@ -145,7 +150,7 @@ function Upload({ onUpload, canUpload }) {
 
 function Progress({ message }) {
   return (
-    <div className="flex flex-row items-center justify-center">
+    <div className="flex min-w-[32rem] flex-row items-center justify-center">
       <Spinner />
       <span className="text-2xl">{message}</span>
       <Dots />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSounds } from 'app/hooks';
 import { pieces, startPosition } from 'app/pieces/util';
 
@@ -10,7 +10,7 @@ export default function Board({ initial }) {
   const sounds = useSounds();
 
   const handleClick = (e: MouseEvent, index: number) => {
-    setPicker((old) => (old ? null : [e.clientX, e.clientY, index]));
+    setPicker((old) => (old ? null : [e.clientX, e.clientY + window.scrollY, index]));
   };
 
   const handlePick = (type: number) => {
@@ -37,24 +37,28 @@ export default function Board({ initial }) {
 
   return (
     <div>
-      <div className="grid grid-cols-8 rounded border-4 border-kashmir-800">
+      <div className="h-8"></div>
+
+      <div className="my-8 grid grid-cols-8 rounded border-4 border-kashmir-800">
         {pieces.map((type, index) => (
           <Piece key={`p${index}`} index={index} type={type} onClick={handleClick} />
         ))}
       </div>
 
-      <div className="flex flex-row items-center justify-center gap-8">
+      <div className="flex h-8 flex-row items-center justify-center gap-8">
         <button
-          className="flex w-full justify-center rounded transition-colors hover:bg-kashmir-200"
+          className="cursor-pointer rounded bg-kashmir-800 py-1 px-4 text-xl
+                     transition-transform hover:scale-95 hover:bg-kashmir-700"
           onClick={() => handler(false)}
         >
-          white
+          I'm playing white
         </button>
         <button
-          className="flex w-full justify-center rounded transition-colors hover:bg-kashmir-200"
           onClick={() => handler(true)}
+          className="cursor-pointer rounded bg-kashmir-800 py-1 px-4 text-xl
+                     transition-transform hover:scale-95 hover:bg-kashmir-700"
         >
-          black
+          I'm playing black
         </button>
       </div>
 
@@ -82,21 +86,34 @@ function Piece({ index, type, onClick }) {
 }
 
 function Picker({ x, y, onClick }) {
+  const [offset, setOffset] = useState<number>(window.scrollY);
+  const handleScroll = useCallback(() => setOffset(window.scrollY), []);
+
   const hidden = !x || !y;
 
   const style = {
     position: 'fixed',
-    left: `${x || 0}px`,
-    top: `${y || 0}px`,
+    left: `${Math.floor(x - 96)}px`,
+    top: `${Math.floor(y - offset)}px`,
     opacity: hidden ? '0' : '95',
     display: hidden ? 'none' : undefined,
   };
 
+  useEffect(() => {
+    setOffset(window.scrollY);
+
+    if (hidden) return;
+
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [hidden]);
+
   return (
     <div
-      className="grid w-32 grid-cols-2 place-items-center
-          rounded border-2 border-kashmir-800 bg-kashmir-300
-          transition-opacity"
+      className="grid w-48 grid-cols-4 place-items-center
+                 rounded border-2 border-kashmir-800 bg-kashmir-300"
       style={style as any}
     >
       {Array.from(pieces.entries()).map(([key, piece]) => (
@@ -110,7 +127,7 @@ function Picker({ x, y, onClick }) {
       ))}
       <button
         key="clear"
-        className="col-span-2 w-full rounded py-2 font-bold text-kashmir-900 transition-colors hover:bg-kashmir-200"
+        className="col-span-4 w-full rounded py-2 font-bold text-kashmir-900 transition-colors hover:bg-kashmir-200"
         onClick={() => onClick(0)}
       >
         Clear
