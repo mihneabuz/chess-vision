@@ -1,27 +1,36 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useSounds } from 'app/hooks';
-import { pieces, startPosition } from 'app/pieces/util';
+import { CSSProperties, useCallback, useRef, useState } from 'react';
+import { useScroll, useSounds } from 'app/hooks';
+import { pieces, squareToPos, startPosition } from 'app/pieces/util';
+
+interface Point {
+  x: number;
+  y: number;
+}
 
 export default function Board({ initial }) {
   const [pieces, setPieces] = useState<number[]>(initial || startPosition);
   const [picker, setPicker] = useState<[number, number, number] | null>(null);
+  const [arrow, setArrow] = useState<{ from?: Point; to?: Point }>({});
+  const boardRef = useRef<HTMLDivElement>(null);
   const sounds = useSounds();
 
-  const handleClick = (e: MouseEvent, index: number) => {
-    setPicker((old) => (old ? null : [e.clientX, e.clientY + window.scrollY, index]));
-  };
+  const handleClick = useCallback((e: MouseEvent, index: number) => {
+    setPicker((old) => (old ? null : [e.clientX, e.clientY, index]));
+  }, []);
 
-  const handlePick = (type: number) => {
+  const handlePick = useCallback((type: number) => {
     if (!picker) return;
-    const square = picker[2];
     sounds.thock1.play();
-    setPieces((pieces) => pieces.map((val, idx) => (idx === square ? type : val)));
+    setPieces((pieces) => pieces.map((val, idx) => (idx === picker[2] ? type : val)));
     setPicker(null);
-  };
+    setArrow({});
+  }, [picker, sounds]);
 
-  const handler = async (black: boolean) => {
+  const handler = useCallback(async (black: boolean) => {
+    setArrow({});
+
     const res = await fetch('/api/generate', {
       method: 'POST',
       body: JSON.stringify({
@@ -32,14 +41,39 @@ export default function Board({ initial }) {
 
     const data = await res.json();
 
-    console.log(data);
-  };
+    if (!data.success) return;
+
+    const move: string = data.move;
+
+    let from = squareToPos.get(move.substring(0, 2)) ?? 0;
+    let to = squareToPos.get(move.substring(2, 4)) ?? 0;
+
+    if (black) {
+      from = 63 - from;
+      to = 63 - to;
+    }
+
+    const board = boardRef.current;
+    if (!board) return;
+
+    const fromRect = board.children.item(from)?.getBoundingClientRect();
+    const toRect = board.children.item(to)?.getBoundingClientRect();
+
+    if (fromRect && toRect) {
+      setArrow({
+        from: rectCenter(fromRect),
+        to: rectCenter(toRect),
+      });
+    }
+
+    sounds.thock1.play();
+  }, [sounds, pieces]);
 
   return (
     <div>
       <div className="h-8"></div>
 
-      <div className="my-8 grid grid-cols-8 rounded border-4 border-kashmir-800">
+      <div ref={boardRef} className="my-8 grid grid-cols-8 rounded border-4 border-kashmir-800">
         {pieces.map((type, index) => (
           <Piece key={`p${index}`} index={index} type={type} onClick={handleClick} />
         ))}
@@ -51,18 +85,19 @@ export default function Board({ initial }) {
                      transition-transform hover:scale-95 hover:bg-kashmir-700"
           onClick={() => handler(false)}
         >
-          I'm playing white
+          I{'\''}m playing white
         </button>
         <button
           onClick={() => handler(true)}
           className="cursor-pointer rounded bg-kashmir-800 py-1 px-4 text-xl
                      transition-transform hover:scale-95 hover:bg-kashmir-700"
         >
-          I'm playing black
+          I{'\''}m playing black
         </button>
       </div>
 
       <Picker onClick={handlePick} x={picker && picker[0]} y={picker && picker[1]} />
+      <Arrow from={arrow.from} to={arrow.to} />
     </div>
   );
 }
@@ -86,34 +121,21 @@ function Piece({ index, type, onClick }) {
 }
 
 function Picker({ x, y, onClick }) {
-  const [offset, setOffset] = useState<number>(window.scrollY);
-  const handleScroll = useCallback(() => setOffset(window.scrollY), []);
-
   const hidden = !x || !y;
+
+  const offset = useScroll(!hidden);
 
   const style = {
     position: 'fixed',
     left: `${Math.floor(x - 96)}px`,
-    top: `${Math.floor(y - offset)}px`,
-    opacity: hidden ? '0' : '95',
+    top: `${Math.floor(y + offset)}px`,
     display: hidden ? 'none' : undefined,
   };
 
-  useEffect(() => {
-    setOffset(window.scrollY);
-
-    if (hidden) return;
-
-    window.addEventListener('scroll', handleScroll, true);
-    return () => {
-      window.removeEventListener('scroll', handleScroll, true);
-    };
-  }, [hidden]);
-
   return (
     <div
-      className="grid w-48 grid-cols-4 place-items-center
-                 rounded border-2 border-kashmir-800 bg-kashmir-300"
+      className="z-40 grid w-48 grid-cols-4 place-items-center rounded
+                 border-2 border-kashmir-800 bg-kashmir-300 opacity-95"
       style={style as any}
     >
       {Array.from(pieces.entries()).map(([key, piece]) => (
@@ -134,4 +156,54 @@ function Picker({ x, y, onClick }) {
       </button>
     </div>
   );
+}
+
+function Arrow({ from, to }) {
+  const offset = useScroll(from && to);
+
+  let style: CSSProperties = {
+    display: 'none',
+  };
+
+  let skew: CSSProperties = {};
+
+  if (from && to) {
+    style = {
+      left: `${Math.floor(Math.min(from.x, to.x))}px`,
+      top: `${Math.floor(Math.min(from.y, to.y)) + offset}px`,
+      width: `${Math.floor(Math.abs(from.x - to.x))}px`,
+      height: `${Math.floor(Math.abs(from.y - to.y))}px`,
+    };
+
+    const [dist, angle] = computePoints(to, from);
+
+    skew = {
+      rotate: `${angle}rad`,
+      height: dist - 10,
+    };
+  }
+
+  return (
+    <div className="pointer-events-none fixed flex items-center justify-center" style={style}>
+      <div className="relative w-6 rounded bg-kashmir-800 opacity-95" style={skew}>
+        <div className="absolute -top-4 -left-4 h-16 w-6 rotate-45 rounded bg-kashmir-800"></div>
+        <div className="absolute -top-4 left-4 h-16 w-6 -rotate-45 rounded bg-kashmir-800"></div>
+      </div>
+    </div>
+  );
+}
+
+function rectCenter(rect: DOMRect): Point {
+  return {
+    x: rect.x + rect.width / 2,
+    y: rect.y + rect.height / 2,
+  };
+}
+
+function computePoints(p1: Point, p2: Point): [number, number] {
+  const dy = -(p1.y - p2.y);
+  const dx = p1.x - p2.x;
+  const dist = Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2));
+  const angle = Math.atan2(dx, dy);
+  return [dist, angle];
 }
