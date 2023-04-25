@@ -2,7 +2,7 @@
 
 import { CSSProperties, useCallback, useRef, useState } from 'react';
 import { useScroll, useSounds } from 'app/hooks';
-import { pieces, squareToPos, startPosition } from 'app/pieces/util';
+import { pieces, startPosition } from 'app/pieces/util';
 
 interface Point {
   x: number;
@@ -41,17 +41,11 @@ export default function Board({ initial }) {
 
     const data = await res.json();
 
-    if (!data.success) return;
-
-    const move: string = data.move;
-
-    let from = squareToPos.get(move.substring(0, 2)) ?? 0;
-    let to = squareToPos.get(move.substring(2, 4)) ?? 0;
-
-    if (black) {
-      from = 63 - from;
-      to = 63 - to;
+    if (!data.success) {
+      return;
     }
+
+    let { from, to } = data;
 
     const board = boardRef.current;
     if (!board) return;
@@ -171,8 +165,8 @@ function Arrow({ from, to }) {
     style = {
       left: `${Math.floor(Math.min(from.x, to.x))}px`,
       top: `${Math.floor(Math.min(from.y, to.y)) + offset}px`,
-      width: `${Math.floor(Math.abs(from.x - to.x))}px`,
-      height: `${Math.floor(Math.abs(from.y - to.y))}px`,
+      width: `${Math.floor(Math.max(Math.abs(from.x - to.x), 20))}px`,
+      height: `${Math.floor(Math.max(Math.abs(from.y - to.y), 20))}px`,
     };
 
     const [dist, angle] = computePoints(to, from);

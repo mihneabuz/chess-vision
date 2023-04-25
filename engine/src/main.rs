@@ -21,8 +21,18 @@ pub struct Request {
 #[derive(Serialize, Debug)]
 pub struct Response {
     pub success: bool,
+
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<String>,
+    #[serde(flatten)]
+    pub data: Option<Payload>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct Payload {
+    #[serde(rename = "move")]
+    pub mov: String,
+    pub from: u8,
+    pub to: u8
 }
 
 impl Response {
@@ -33,10 +43,10 @@ impl Response {
         }
     }
 
-    fn from_data(data: Option<String>) -> Self {
+    fn from_payload(data: Option<Payload>) -> Self {
         Self {
             success: data.is_some(),
-            data,
+            data
         }
     }
 }
@@ -61,16 +71,19 @@ async fn main() -> Result<()> {
 }
 
 async fn generate(State(engine): State<Engine>, Json(payload): Json<Request>) -> Json<Response> {
-    println!("{:?}", payload);
-
-    let fen = match board::decode(payload) {
+    let fen = match board::decode(payload.pieces, payload.black) {
         Some(fen) => fen,
         None => return Json(Response::error()),
     };
 
     println!("{:?}", fen);
 
-    let data = engine.lock().unwrap().generate(fen).ok();
+    let payload = engine.lock().unwrap().generate(fen).ok().map(|mov| {
+        let (from, to) = board::decode_move(&mov, payload.black);
+        Payload { mov, from, to }
+    });
 
-    Json(Response::from_data(data))
+    println!("{:?}", &payload);
+
+    Json(Response::from_payload(payload))
 }
