@@ -162,11 +162,14 @@ function Arrow({ from, to }) {
   let skew: CSSProperties = {};
 
   if (from && to) {
+    const xOffset = from.x === to.x ? 10 : 0;
+    const yOffset = from.y === to.y ? 10 : 0;
+
     style = {
-      left: `${Math.floor(Math.min(from.x, to.x))}px`,
-      top: `${Math.floor(Math.min(from.y, to.y)) + offset}px`,
-      width: `${Math.floor(Math.max(Math.abs(from.x - to.x), 20))}px`,
-      height: `${Math.floor(Math.max(Math.abs(from.y - to.y), 20))}px`,
+      left: `${Math.floor(Math.min(from.x, to.x) - xOffset)}px`,
+      top: `${Math.floor(Math.min(from.y, to.y)) - yOffset + offset}px`,
+      width: `${Math.floor(Math.abs(from.x - to.x) + 2 * xOffset)}px`,
+      height: `${Math.floor(Math.abs(from.y - to.y) + 2 * yOffset)}px`,
     };
 
     const [dist, angle] = computePoints(to, from);
