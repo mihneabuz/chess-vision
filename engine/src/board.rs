@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use chess::{Board, BoardBuilder, Color, Piece, Square, File, Rank};
 
-pub fn decode(pieces: Vec<u8>, black: bool) -> Option<String> {
+pub fn decode_board(pieces: Vec<u8>, black: bool) -> Option<String> {
     if pieces.len() != 64 {
         return None;
     }
@@ -55,20 +55,21 @@ pub fn decode_piece(piece: u8) -> Option<(Piece, Color)> {
     })
 }
 
-pub fn decode_move(mov: &str, black: bool) -> (u8, u8) {
+pub fn decode_move(mov: &str, black: bool) -> Option<(u8, u8)> {
     let (from_str, to_str) = mov.split_at(2);
 
-    let from = decode_square(from_str, black);
-    let to = decode_square(to_str, black);
+    let from = decode_square(from_str, black)?;
+    let to = decode_square(to_str, black)?;
 
-    (from, to)
+    Some((from, to))
 }
 
-pub fn decode_square(sq: &str, black: bool) -> u8 {
-    let square = Square::from_str(sq).unwrap();
+pub fn decode_square(sq: &str, black: bool) -> Option<u8> {
+    let square = Square::from_str(sq).ok()?;
+
     if black {
-        (8 * square.get_rank().to_index() + square.get_file().to_index()) as u8
+        Some((8 * square.get_rank().to_index() + square.get_file().to_index()) as u8)
     } else {
-        (8 * (7 - square.get_rank().to_index()) + square.get_file().to_index()) as u8
+        Some((8 * (7 - square.get_rank().to_index()) + square.get_file().to_index()) as u8)
     }
 }

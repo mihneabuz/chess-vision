@@ -43,10 +43,10 @@ impl Response {
         }
     }
 
-    fn from_payload(data: Option<Payload>) -> Self {
+    fn from_payload(payload: Payload) -> Self {
         Self {
-            success: data.is_some(),
-            data
+            success: true,
+            data: Some(payload)
         }
     }
 }
@@ -71,19 +71,19 @@ async fn main() -> Result<()> {
 }
 
 async fn generate(State(engine): State<Engine>, Json(payload): Json<Request>) -> Json<Response> {
-    let fen = match board::decode(payload.pieces, payload.black) {
-        Some(fen) => fen,
-        None => return Json(Response::error()),
+    let Some(fen) = board::decode_board(payload.pieces, payload.black) else {
+        return Json(Response::error());
     };
 
     println!("{:?}", fen);
 
-    let payload = engine.lock().unwrap().generate(fen).ok().map(|mov| {
-        let (from, to) = board::decode_move(&mov, payload.black);
-        Payload { mov, from, to }
-    });
+    let Some(mov) = engine.lock().unwrap().generate(fen).ok() else {
+        return Json(Response::error());
+    };
 
-    println!("{:?}", &payload);
+    let Some((from, to)) = board::decode_move(&mov, payload.black) else {
+        return Json(Response::error());
+    };
 
-    Json(Response::from_payload(payload))
+    Json(Response::from_payload(Payload { mov, from, to }))
 }
