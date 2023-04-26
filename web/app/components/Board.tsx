@@ -15,6 +15,7 @@ export default function Board({ initial }) {
   const [arrow, setArrow] = useState<{ from?: Point; to?: Point }>({});
   const boardRef = useRef<HTMLDivElement>(null);
   const sounds = useSounds();
+  const [error, setError] = useState("");
 
   const handleClick = useCallback((e: MouseEvent, index: number) => {
     setPicker((old) => (old ? null : [e.clientX, e.clientY, index]));
@@ -26,10 +27,12 @@ export default function Board({ initial }) {
     setPieces((pieces) => pieces.map((val, idx) => (idx === picker[2] ? type : val)));
     setPicker(null);
     setArrow({});
+    setError('');
   }, [picker, sounds]);
 
   const handler = useCallback(async (black: boolean) => {
     setArrow({});
+    setError('');
 
     const res = await fetch('/api/generate', {
       method: 'POST',
@@ -42,6 +45,7 @@ export default function Board({ initial }) {
     const data = await res.json();
 
     if (!data.success) {
+      setError('Board position is invalid!');
       return;
     }
 
@@ -65,7 +69,9 @@ export default function Board({ initial }) {
 
   return (
     <div>
-      <div className="h-8"></div>
+      <div className="h-8 flex items-center justify-center text-xl text-red-500">
+        {error}
+      </div>
 
       <div ref={boardRef} className="my-8 grid grid-cols-8 rounded border-4 border-kashmir-800">
         {pieces.map((type, index) => (
