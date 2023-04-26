@@ -1,7 +1,7 @@
 'use client';
 
 import { CSSProperties, useCallback, useRef, useState } from 'react';
-import { useScroll, useSounds } from 'app/hooks';
+import { usePosition, useScroll, useSounds } from 'app/hooks';
 import { pieces, startPosition } from 'app/pieces/util';
 
 interface Point {
@@ -11,15 +11,37 @@ interface Point {
 
 export default function Board({ initial }) {
   const [pieces, setPieces] = useState<number[]>(initial || startPosition);
+  const [holding, setHolding] = useState<number | null>(null);
   const [picker, setPicker] = useState<[number, number, number] | null>(null);
   const [arrow, setArrow] = useState<{ from?: Point; to?: Point }>({});
   const boardRef = useRef<HTMLDivElement>(null);
   const sounds = useSounds();
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
-  const handleClick = useCallback((e: MouseEvent, index: number) => {
+  const handleClick = useCallback((index: number) => {
+    setPicker(null);
+
+    if (pieces[index] === 0 && holding === null) {
+      return sounds.thack.play();
+    }
+
+    if (holding !== null) {
+      const piece = pieces[holding];
+      setHolding(null);
+      setArrow({});
+      setPieces((pieces) =>
+        pieces.map((val, idx) => (idx === index ? piece : idx === holding ? 0 : val))
+      );
+      return sounds.thock2.play();
+    }
+
+    setHolding(index);
+  }, [holding, pieces, sounds]);
+
+  const handleRightClick = useCallback((e: MouseEvent, index: number) => {
+    if (holding) return;
     setPicker((old) => (old ? null : [e.clientX, e.clientY, index]));
-  }, []);
+  }, [holding]);
 
   const handlePick = useCallback((type: number) => {
     if (!picker) return;
@@ -30,19 +52,11 @@ export default function Board({ initial }) {
     setError('');
   }, [picker, sounds]);
 
-  const handler = useCallback(async (black: boolean) => {
+  const handleGenerate = useCallback(async (black: boolean) => {
     setArrow({});
     setError('');
 
-    const res = await fetch('/api/generate', {
-      method: 'POST',
-      body: JSON.stringify({
-        pieces,
-        black,
-      }),
-    });
-
-    const data = await res.json();
+    const data = await generate(pieces, black);
 
     if (!data.success) {
       setError('Board position is invalid!');
@@ -69,13 +83,19 @@ export default function Board({ initial }) {
 
   return (
     <div>
-      <div className="h-8 flex items-center justify-center text-xl text-red-500">
+      <div className="flex h-8 items-center justify-center text-xl text-red-400 font-semibold">
         {error}
       </div>
 
       <div ref={boardRef} className="my-8 grid grid-cols-8 rounded border-4 border-kashmir-800">
         {pieces.map((type, index) => (
-          <Piece key={`p${index}`} index={index} type={type} onClick={handleClick} />
+          <Piece
+            key={`p${index}`}
+            index={index}
+            type={holding === index ? 0 : type}
+            onClick={handleClick}
+            onRightClick={handleRightClick}
+          />
         ))}
       </div>
 
@@ -83,40 +103,60 @@ export default function Board({ initial }) {
         <button
           className="cursor-pointer rounded bg-kashmir-800 py-1 px-4 text-xl
                      transition-transform hover:scale-95 hover:bg-kashmir-700"
-          onClick={() => handler(false)}
+          onClick={() => handleGenerate(false)}
         >
-          I{'\''}m playing white
+          I{"'"}m playing white
         </button>
         <button
-          onClick={() => handler(true)}
+          onClick={() => handleGenerate(true)}
           className="cursor-pointer rounded bg-kashmir-800 py-1 px-4 text-xl
                      transition-transform hover:scale-95 hover:bg-kashmir-700"
         >
-          I{'\''}m playing black
+          I{"'"}m playing black
         </button>
       </div>
 
       <Picker onClick={handlePick} x={picker && picker[0]} y={picker && picker[1]} />
       <Arrow from={arrow.from} to={arrow.to} />
+      <Floating type={holding !== null && pieces[holding]} />
     </div>
   );
 }
 
-function Piece({ index, type, onClick }) {
+function Piece({ index, type, onClick, onRightClick }) {
   const color = (index + Math.floor(index / 8)) % 2 === 0 ? 'bg-kashmir-200' : 'bg-kashmir-500';
   const piece = pieces.get(type);
 
   return (
     <div
       className={`flex aspect-square min-w-[4rem] items-center justify-center ${color}`}
-      onClick={(e) => onClick(e, index)}
+      onClick={() => onClick(index)}
+      onContextMenu={(e) => { e.preventDefault(); onRightClick(e, index)}}
     >
-      {piece ? (
-        <img className="w-full opacity-80" src={piece.src} />
-      ) : (
-        <div className="border-none" />
-      )}
+      {piece && <img className="w-full opacity-80" src={piece.src} />}
     </div>
+  );
+}
+
+function Floating({ type }) {
+  const position = usePosition();
+  const piece = pieces.get(type);
+
+  const style: CSSProperties = {
+    top: position.y,
+    left: position.x,
+    transform: 'translate(-2.5rem, -2.5rem)',
+  };
+
+  return (
+    piece && (
+      <div
+        className={`fixed flex aspect-square w-20 items-center justify-center pointer-events-none`}
+        style={style}
+      >
+        <img className="w-full opacity-90" src={piece.src} />
+      </div>
+    )
   );
 }
 
@@ -127,8 +167,8 @@ function Picker({ x, y, onClick }) {
 
   const style = {
     position: 'fixed',
-    left: `${Math.floor(x - 96)}px`,
-    top: `${Math.floor(y + offset)}px`,
+    left: x - 96,
+    top: y + offset,
     display: hidden ? 'none' : undefined,
   };
 
@@ -172,10 +212,10 @@ function Arrow({ from, to }) {
     const yOffset = from.y === to.y ? 10 : 0;
 
     style = {
-      left: `${Math.floor(Math.min(from.x, to.x) - xOffset)}px`,
-      top: `${Math.floor(Math.min(from.y, to.y)) - yOffset + offset}px`,
-      width: `${Math.floor(Math.abs(from.x - to.x) + 2 * xOffset)}px`,
-      height: `${Math.floor(Math.abs(from.y - to.y) + 2 * yOffset)}px`,
+      left:   Math.min(from.x, to.x) - xOffset,
+      top:    Math.min(from.y, to.y) - yOffset + offset,
+      width:  Math.abs(from.x - to.x) + 2 * xOffset,
+      height: Math.abs(from.y - to.y) + 2 * yOffset,
     };
 
     const [dist, angle] = computePoints(to, from);
@@ -201,6 +241,20 @@ function rectCenter(rect: DOMRect): Point {
     x: rect.x + rect.width / 2,
     y: rect.y + rect.height / 2,
   };
+}
+
+async function generate(pieces: number[], black: boolean) {
+  const res = await fetch('/api/generate', {
+    method: 'POST',
+    body: JSON.stringify({
+      pieces,
+      black,
+    }),
+  });
+
+  const data = await res.json();
+
+  return data;
 }
 
 function computePoints(p1: Point, p2: Point): [number, number] {

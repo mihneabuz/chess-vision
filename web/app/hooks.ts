@@ -37,6 +37,22 @@ export function useScroll(active: boolean) {
   return initial - current;
 }
 
+export function usePosition(): { x: number, y: number } {
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const handleMove = useCallback((e: MouseEvent) => {
+    setPosition({ x: e.x, y: e.y });
+  }, [setPosition]);
+
+  useEffect(() => {
+    window.addEventListener('mousemove', handleMove, true);
+    return () => {
+    window.removeEventListener('mousemove', handleMove, true);
+    };
+  })
+
+  return position;
+}
+
 export function useSounds() {
   return useMemo(() => sounds(), []);
 }
