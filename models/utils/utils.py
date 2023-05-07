@@ -74,19 +74,22 @@ def validation_metrics(model, dataloader, transform, results):
 
     return accuracy[0], f1[0], precision[0], recall
 
+def id(x, y):
+    return x, y
 
 class SimpleDataset(Dataset):
-    def __init__(self, x, y):
+    def __init__(self, x, y, augment=id):
         self.data = list(zip(x, y))
+        self.augment = augment
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return self.data[idx]
+        return self.augment(*self.data[idx])
 
-def dataset(x, y):
-    return SimpleDataset(x, y)
+def dataset(x, y, augment=id):
+    return SimpleDataset(x, y, augment)
 
 def bytes_as_file(bytes: bytes) -> BytesIO:
     memfile = BytesIO()
