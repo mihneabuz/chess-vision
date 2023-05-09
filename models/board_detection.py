@@ -12,33 +12,38 @@ import service as service
 
 size = 224
 
+
 def tensor_transform(image):
     resized = cv2.resize(image, (size, size))
     return torch.from_numpy(resized.transpose(2, 0, 1))
+
 
 def jit_transform(x):
     normalize = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     return normalize(x / 255)
 
+
 def set_grad(model, requires_grad):
     for param in model.parameters():
         param.requires_grad = requires_grad
+
 
 def load_datasets(limit=-1):
     images = []
     corners = []
     for image, annotations in load_data(max=limit):
         images.append(tensor_transform(image))
-        corners.append(torch.tensor(annotations['corners']))
+        corners.append(torch.tensor(list(map(lambda x: [x[0], 1 - x[1]], annotations['corners']))))
 
     print(f'loaded {len(images)} images')
     print(f'image size: {images[0].shape}')
 
-    size = len(images)
-    train_size = int(size * 0.8)
-    valid_size = size - train_size
+    count = len(images)
+    train_size = int(count * 0.8)
+    valid_size = count - train_size
 
     return random_split(dataset(images, corners), [train_size, valid_size])
+
 
 def create_model(pretrained=True):
     if pretrained:
@@ -49,33 +54,43 @@ def create_model(pretrained=True):
     model.classifier.append(torch.nn.Linear(in_features=last_layer_size, out_features=8))
     return model
 
+
 def load_model():
     model = create_model()
     model.load_state_dict(torch.load('./board_detection_weights'))
     return model
 
+
 def old_loss_func(predicted, real):
-    grouped1 = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
-    grouped2 = torch.stack((predicted[:, 6:8], predicted[:, 4:6], predicted[:, 2:4], predicted[:, 0:2]), 1)
+    grouped1 = torch.stack((predicted[:, 0:2], predicted[:, 2:4],
+                           predicted[:, 4:6], predicted[:, 6:8]), 1)
+    grouped2 = torch.stack((predicted[:, 6:8], predicted[:, 4:6],
+                           predicted[:, 2:4], predicted[:, 0:2]), 1)
 
     dists1 = (grouped1 - real).pow(2).sum(2).sqrt().sum(1)
     dists2 = (grouped2 - real).pow(2).sum(2).sqrt().sum(1)
 
     return torch.min(dists1, dists2).sum()
 
+
 def loss_func_sum(predicted, real):
-    grouped = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
+    grouped = torch.stack((predicted[:, 0:2], predicted[:, 2:4],
+                          predicted[:, 4:6], predicted[:, 6:8]), 1)
     return (grouped - real).pow(2).sum(2).sqrt().sum(1).sum()
 
+
 def loss_func_max(predicted, real):
-    grouped = torch.stack((predicted[:, 0:2], predicted[:, 2:4], predicted[:, 4:6], predicted[:, 6:8]), 1)
+    grouped = torch.stack((predicted[:, 0:2], predicted[:, 2:4],
+                          predicted[:, 4:6], predicted[:, 6:8]), 1)
     maxss, _ = torch.max((grouped - real).pow(2).sum(2).sqrt(), dim=1)
     return maxss.sum()
+
 
 def loss_func_sum_diag(predicted, real):
     grouped = torch.stack((predicted[:, 0:2], predicted[:, 6:8]), 1)
     real = torch.stack((real[:, 0], real[:, 3]), 1)
     return (grouped - real).pow(2).sum(2).sqrt().sum(1).sum()
+
 
 def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
     device = get_device()
@@ -87,11 +102,12 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
     i = 0
     for image, corners in train_ds:
         im = image.numpy().transpose(1, 2, 0)
+        c = (corners.numpy() * size).astype(np.int32)
 
-        cv2.circle(im, (int(corners[0][1] * size), int(corners[0][0] * size)), 2, (255, 0, 0), 2)
-        cv2.circle(im, (int(corners[1][1] * size), int(corners[1][0] * size)), 2, (0, 255, 0), 2)
-        cv2.circle(im, (int(corners[2][1] * size), int(corners[2][0] * size)), 2, (0, 0, 255), 2)
-        cv2.circle(im, (int(corners[3][1] * size), int(corners[3][0] * size)), 2, (0, 255, 255), 2)
+        cv2.circle(im, (c[0][0], c[0][1]), 2, (255, 0, 0), 2)
+        cv2.circle(im, (c[1][0], c[1][1]), 2, (0, 255, 0), 2)
+        cv2.circle(im, (c[2][0], c[2][1]), 2, (0, 0, 255), 2)
+        cv2.circle(im, (c[3][0], c[3][1]), 2, (0, 255, 255), 2)
 
         plt.imshow(im)
         plt.show()
@@ -140,15 +156,17 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
         preds = model(jit_transform(image)[None, :, :, :].to(device))
         im = image.numpy().transpose(1, 2, 0)
 
-        cv2.circle(im, [int(corners[0][1] * size), int(corners[0][0] * size)], 2, (255, 0, 0), 2)
-        cv2.circle(im, [int(corners[1][1] * size), int(corners[1][0] * size)], 2, (0, 255, 0), 2)
-        cv2.circle(im, [int(corners[2][1] * size), int(corners[2][0] * size)], 2, (0, 0, 255), 2)
-        cv2.circle(im, [int(corners[3][1] * size), int(corners[3][0] * size)], 2, (0, 255, 255), 2)
+        c = (corners.numpy() * size).astype(np.int32)
+        cv2.circle(im, (c[0][0], c[0][1]), 2, (255, 0, 0), 2)
+        cv2.circle(im, (c[1][0], c[1][1]), 2, (0, 255, 0), 2)
+        cv2.circle(im, (c[2][0], c[2][1]), 2, (0, 0, 255), 2)
+        cv2.circle(im, (c[3][0], c[3][1]), 2, (0, 255, 255), 2)
 
-        cv2.circle(im, [int(preds[0][1] * size), int(preds[0][0] * size)], 6, (255, 0, 0), 2)
-        cv2.circle(im, [int(preds[0][3] * size), int(preds[0][2] * size)], 6, (0, 255, 0), 2)
-        cv2.circle(im, [int(preds[0][5] * size), int(preds[0][4] * size)], 6, (0, 0, 255), 2)
-        cv2.circle(im, [int(preds[0][7] * size), int(preds[0][6] * size)], 6, (0, 255, 255), 2)
+        p = (preds.detach().cpu().numpy() * size).astype(np.int32)[0]
+        cv2.circle(im, (p[0], p[1]), 6, (255, 0, 0), 2)
+        cv2.circle(im, (p[2], p[3]), 6, (0, 255, 0), 2)
+        cv2.circle(im, (p[4], p[5]), 6, (0, 0, 255), 2)
+        cv2.circle(im, (p[6], p[7]), 6, (0, 255, 255), 2)
 
         plt.imshow(im)
         plt.show()
@@ -157,15 +175,17 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
         if (i > 20):
             break
 
-    torch.save(model.state_dict(), './board_detection_weights');
+    torch.save(model.state_dict(), './board_detection_weights')
+
 
 class Service(service.Service):
     def __init__(self):
         self.name = 'board_detection'
-        self.model = create_model(pretrained=False);
+        self.model = create_model(pretrained=False)
 
     def load_model(self, data):
-        self.model.load_state_dict(torch.load(bytes_as_file(data), map_location=torch.device('cpu')))
+        self.model.load_state_dict(torch.load(
+            bytes_as_file(data), map_location=torch.device('cpu')))
 
     def _transform_in(self, input):
         image = image_from_bytes(input[0])
@@ -177,5 +197,6 @@ class Service(service.Service):
     def _process_batch(self, data):
         return self.model(torch.stack(data)).detach().numpy()
 
+
 if __name__ == '__main__':
-    train(50, lr=0.00001, batch_size=10, load_dict=True, limit=-1)
+    train(30, lr=0.00003, batch_size=12, load_dict=False, limit=-1)

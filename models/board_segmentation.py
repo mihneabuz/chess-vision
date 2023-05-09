@@ -2,7 +2,8 @@ import numpy as np
 import torch
 import torchvision.transforms.functional as TF
 import torchvision.transforms as T
-from torch.utils.data import random_split, DataLoader
+from torch.utils.data import DataLoader
+from sklearn.model_selection import train_test_split
 import cv2
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -10,26 +11,32 @@ import random
 
 from utils.load_data import load_data
 from utils.utils import get_device, train_loop, dataset, summary
-import service as service
 
 import u2net.model as u2net
 
-size = 200
+size = 224
+
 
 def augment(image, mask):
-    if random.random() > 0.6:
+    if random.random() > 0.5:
         angle = random.randint(-30, 30)
         image = TF.rotate(image, angle, interpolation=T.InterpolationMode.BILINEAR)
         mask = TF.rotate(torch.unsqueeze(mask, 0), angle)[0, :, :]
+
+    if random.random() > 0.4:
+        image = TF.adjust_hue(image, random.randint(-1, 1) / 10)
+
     return image, mask
+
 
 def tensor_transform(image):
     resized = cv2.resize(image, (size, size))
     return torch.from_numpy(resized.transpose(2, 0, 1))
 
+
 def jit_transform(x):
-    normalize = T.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-    return normalize(x / 255)
+    return TF.normalize(x / 255, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+
 
 def load_datasets(limit=-1):
     images = []
@@ -40,7 +47,8 @@ def load_datasets(limit=-1):
         mask = np.zeros((size, size), dtype=np.float32)
         corners = list(map(lambda x: [x[0], 1 - x[1]], annotations['corners']))
         corners = [corners[0], corners[1], corners[3], corners[2]]
-        cv2.fillPoly(mask, pts=[(np.array(corners) * size).astype(np.int32)], color=1)
+        cv2.fillPoly(
+            mask, pts=[(np.array(corners) * size).astype(np.int32)], color=1)
         masks.append(torch.tensor(mask))
 
     print(f'loaded {len(images)} images')
@@ -50,10 +58,20 @@ def load_datasets(limit=-1):
     train_size = int(count * 0.8)
     valid_size = count - train_size
 
-    return random_split(dataset(images, masks, augment=augment), [train_size, valid_size])
+    train_im, test_im, train_mk, test_mk = train_test_split(
+        images, masks, test_size=valid_size)
+    train = dataset(train_im, train_mk, augment=augment)
+    test = dataset(test_im, test_mk)
 
-def create_model():
-    return u2net.U2NETP()
+    return train, test
+
+
+def create_model(load_dict=False):
+    model = u2net.U2NETP()
+    if load_dict:
+        model.load_state_dict(torch.load('./board_segmentation_weights'))
+    return model
+
 
 def loss_func(preds, real):
     (d1, d2, d3, d4, d5, d6, d7) = preds
@@ -68,7 +86,8 @@ def loss_func(preds, real):
 
     return l1 + l2 + l3 + l4 + l5 + l6 + l7
 
-def train(epochs, lr=0.0001, batch_size=4, limit=-1):
+
+def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
     device = get_device()
 
     train_ds, valid_ds = load_datasets(limit=limit)
@@ -79,7 +98,7 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1):
     for image, mask in train_ds:
         im = image.numpy().transpose(1, 2, 0)
         mk = mask.numpy()
-        im[mk == 0] = (im[mk == 0].astype(np.float32) * 0.2).astype(np.uint8)
+        im[mk == 0] = (im[mk == 0].astype(np.float32) * 0.4).astype(np.uint8)
 
         plt.imshow(im)
         plt.show()
@@ -88,11 +107,11 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1):
         if (i > 5):
             break
 
-    model = create_model()
+    model = create_model(load_dict=load_dict)
     model.to(device)
     summary(model, (3, size, size))
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0)
     criterion = loss_func
 
     losses = []
@@ -116,15 +135,17 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1):
     for image, mask in valid_ds:
         preds = model(jit_transform(image)[None, :, :, :].to(device))
         im = image.numpy().transpose(1, 2, 0)
-        mk = preds[0][0, 0, :, :].cpu().detach().numpy()
-        im[mk < 0.5] *= 0
+        mk = (preds[0][0, 0, :, :].cpu().detach().numpy() * 255).astype(np.uint8)
 
-        plt.imshow(im)
-        plt.show()
+        from corners import debug_corners
+        debug_corners(im, mk)
 
         i += 1
         if (i > 20):
             break
 
+    torch.save(model.state_dict(), './board_segmentation_weights')
+
+
 if __name__ == '__main__':
-    train(1, lr=0.0003, batch_size=32, limit=20)
+    train(30, lr=0.001, batch_size=12, limit=-1, load_dict=False)

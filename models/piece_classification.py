@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import service as service
 from torchvision import models, transforms
 from torch.utils.data import DataLoader, random_split
 import matplotlib.pyplot as plt
@@ -8,8 +9,8 @@ from random import randint
 
 from utils.load_data import load_data
 from utils.process import crop_board, crop_pieces
-from utils.utils import classes_dict, image_from_bytes, bytes_as_file, deserialize_array, num_classes, get_device, serialize_values, train_loop, validation_metrics, summary, dataset
-import service as service
+from utils.utils import classes_dict, image_from_bytes, bytes_as_file, deserialize_array,\
+    num_classes, get_device, serialize_values, train_loop, validation_metrics, summary, dataset
 
 normalize = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 augments = transforms.Compose([
@@ -17,28 +18,35 @@ augments = transforms.Compose([
     transforms.RandomHorizontalFlip(0.5)
 ])
 
+
 def tensor_transform(image):
     return torch.from_numpy(image.transpose(2, 0, 1))
+
 
 def jit_transform(x):
     return normalize(x / 255)
 
+
 def augment(x):
     return augments(jit_transform(x))
+
 
 def set_grad(model, requires_grad):
     for param in model.parameters():
         param.requires_grad = requires_grad
 
+
 def load_board_images(max=-1):
     for image, annotations in load_data(max=max):
         yield image, annotations['corners']
+
 
 def load_piece_images(max=-1):
     for image, annotations in load_data(max=max):
         board_image = crop_board(image, annotations['corners'])
         pieces, labels = crop_pieces(board_image, annotations['config'])
         yield from zip(pieces, labels)
+
 
 def load_datasets(limit=-1, balance=True):
     pieces_images = []
@@ -76,7 +84,8 @@ def load_datasets(limit=-1, balance=True):
         print(f'dropped {dropped} empty images')
 
         counts = Counter(balanced_pieces_labels)
-        print(f'balanced label distribution: {", ".join([x[0] + ": " + str(x[1]) for x in counts.items()])}')
+        print(
+            f'balanced label distribution: {", ".join([x[0] + ": " + str(x[1]) for x in counts.items()])}')
         plt.bar(counts.keys(), counts.values())
         plt.show()
 
@@ -91,6 +100,7 @@ def load_datasets(limit=-1, balance=True):
 
     return random_split(dataset(pieces_images, pieces_classes), [train_size, valid_size])
 
+
 def create_model(pretrained=True):
     if pretrained:
         model = models.efficientnet_b2(weights=models.EfficientNet_B2_Weights.DEFAULT)
@@ -100,15 +110,18 @@ def create_model(pretrained=True):
     model.classifier.append(torch.nn.Linear(in_features=last_layer_size, out_features=num_classes))
     return model
 
+
 def load_model():
     model = create_model(pretrained=False)
     model.load_state_dict(torch.load('./piece_classification_weights'))
     return model
 
+
 def inference():
     model = load_model()
     model.eval()
     return lambda img: model(jit_transform(tensor_transform(img))[None, :, :, :]).detach().numpy()
+
 
 def train(epochs, lr=0.0001, batch_size=64, limit=-1, load_dict=False):
     device = get_device()
@@ -144,7 +157,8 @@ def train(epochs, lr=0.0001, batch_size=64, limit=-1, load_dict=False):
     plt.plot(losses)
     plt.show()
 
-    metrics = validation_metrics(model, valid_dl, transform=jit_transform, results=lambda preds: torch.argmax(preds, dim=1))
+    metrics = validation_metrics(model, valid_dl, transform=jit_transform,
+                                 results=lambda preds: torch.argmax(preds, dim=1))
     accuracy, f1, precision, recall = metrics
     print(f'accuracy: {accuracy:.4f}\nf1 score: {f1:.4f}')
 
@@ -152,15 +166,17 @@ def train(epochs, lr=0.0001, batch_size=64, limit=-1, load_dict=False):
     for i, label in enumerate(classes_dict.keys()):
         print(f'{label:10} {precision[i]:.2f} {recall[i]:.2f}')
 
-    torch.save(model.state_dict(), './piece_classification_weights');
+    torch.save(model.state_dict(), './piece_classification_weights')
+
 
 class Service(service.Service):
     def __init__(self):
         self.name = 'piece_classification'
-        self.model = create_model(pretrained=False);
+        self.model = create_model(pretrained=False)
 
     def load_model(self, data):
-        self.model.load_state_dict(torch.load(bytes_as_file(data), map_location=torch.device('cpu')))
+        self.model.load_state_dict(torch.load(
+            bytes_as_file(data), map_location=torch.device('cpu')))
 
     def _transform_in(self, input):
         image = image_from_bytes(input[0])
@@ -174,6 +190,7 @@ class Service(service.Service):
 
     def _process_batch(self, data):
         return torch.argmax(self.model(torch.concat(data)), 1).split(64)
+
 
 if __name__ == "__main__":
     train(6, batch_size=32, limit=-1, load_dict=False)

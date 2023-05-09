@@ -31,7 +31,13 @@ def get_device():
 def summary(model, input):
     torchsummary.summary(model, input_size=input, device='cuda' if torch.cuda.is_available() else 'cpu')
 
-def train_loop(model, dataloader, optimizer, criterion, transform=lambda x: x):
+def id1(x):
+    return x
+
+def id2(x, y):
+    return x, y
+
+def train_loop(model, dataloader, optimizer, criterion, transform=id1):
     device = get_device()
     model.train(True)
 
@@ -74,11 +80,8 @@ def validation_metrics(model, dataloader, transform, results):
 
     return accuracy[0], f1[0], precision[0], recall
 
-def id(x, y):
-    return x, y
-
 class SimpleDataset(Dataset):
-    def __init__(self, x, y, augment=id):
+    def __init__(self, x, y, augment=id2):
         self.data = list(zip(x, y))
         self.augment = augment
 
@@ -88,8 +91,8 @@ class SimpleDataset(Dataset):
     def __getitem__(self, idx):
         return self.augment(*self.data[idx])
 
-def dataset(x, y, augment=id):
-    return SimpleDataset(x, y, augment)
+def dataset(x, y, augment=id2):
+    return SimpleDataset(x, y, augment=augment)
 
 def bytes_as_file(bytes: bytes) -> BytesIO:
     memfile = BytesIO()
