@@ -25,17 +25,22 @@ classes_dict = {
 
 num_classes = len(classes_dict)
 
+
 def get_device():
     return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
 def summary(model, input):
     torchsummary.summary(model, input_size=input, device='cuda' if torch.cuda.is_available() else 'cpu')
 
+
 def id1(x):
     return x
 
+
 def id2(x, y):
     return x, y
+
 
 def train_loop(model, dataloader, optimizer, criterion, transform=id1):
     device = get_device()
@@ -56,6 +61,7 @@ def train_loop(model, dataloader, optimizer, criterion, transform=id1):
         optimizer.step()
 
     return losses
+
 
 def validation_metrics(model, dataloader, transform, results):
     device = get_device()
@@ -80,6 +86,7 @@ def validation_metrics(model, dataloader, transform, results):
 
     return accuracy[0], f1[0], precision[0], recall
 
+
 class SimpleDataset(Dataset):
     def __init__(self, x, y, augment=id2):
         self.data = list(zip(x, y))
@@ -91,8 +98,10 @@ class SimpleDataset(Dataset):
     def __getitem__(self, idx):
         return self.augment(*self.data[idx])
 
+
 def dataset(x, y, augment=id2):
     return SimpleDataset(x, y, augment=augment)
+
 
 def bytes_as_file(bytes: bytes) -> BytesIO:
     memfile = BytesIO()
@@ -100,23 +109,28 @@ def bytes_as_file(bytes: bytes) -> BytesIO:
     memfile.seek(0)
     return memfile
 
+
 def image_from_bytes(bytes: bytes) -> np.ndarray:
     return cv2.imdecode(np.frombuffer(bytes, np.uint8), cv2.IMREAD_COLOR)
+
 
 def serialize_array(ndarray: np.ndarray) -> bytes:
     memfile = BytesIO()
     np.save(memfile, ndarray)
     return memfile.getvalue()
 
+
 def deserialize_array(bytes: bytes) -> np.ndarray:
     memfile = bytes_as_file(bytes)
     return np.load(memfile, allow_pickle=True)
+
 
 def serialize_values(values) -> bytes:
     memfile = BytesIO()
     for value in values:
         memfile.write(value)
     return memfile.getvalue()
+
 
 def deserialize_values(bytes: bytes, count: int, dtype):
     memfile = bytes_as_file(bytes)

@@ -9,8 +9,10 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import random
 
+import service as service
 from utils.load_data import load_data
-from utils.utils import get_device, train_loop, dataset, summary
+from utils.corners import find_corners, debug_corners
+from utils.utils import get_device, train_loop, dataset, bytes_as_file, image_from_bytes, summary, serialize_array
 
 import u2net.model as u2net
 
@@ -25,6 +27,19 @@ def augment(image, mask):
 
     if random.random() > 0.4:
         image = TF.adjust_hue(image, random.randint(-1, 1) / 10)
+        image = TF.adjust_contrast(image, 1 + random.randint(-3, 3) / 10)
+
+    if random.random() > 0.8:
+        amount = random.randint(4, 24)
+
+        cropped = TF.center_crop(image, (size - amount, size - amount))
+        image = TF.resize(cropped, (size, size), antialias=None)
+
+        cropped = TF.center_crop(mask[None, :, :], (size - amount, size - amount))
+        mask = TF.resize(cropped, (size, size), antialias=None)[0, :, :]
+
+    if random.random() > 0.9:
+        image = TF.gaussian_blur(image, 3)
 
     return image, mask
 
@@ -58,8 +73,7 @@ def load_datasets(limit=-1):
     train_size = int(count * 0.8)
     valid_size = count - train_size
 
-    train_im, test_im, train_mk, test_mk = train_test_split(
-        images, masks, test_size=valid_size)
+    train_im, test_im, train_mk, test_mk = train_test_split(images, masks, test_size=valid_size)
     train = dataset(train_im, train_mk, augment=augment)
     test = dataset(test_im, test_mk)
 
@@ -67,7 +81,7 @@ def load_datasets(limit=-1):
 
 
 def create_model(load_dict=False):
-    model = u2net.U2NETP()
+    model = u2net.U2NET()
     if load_dict:
         model.load_state_dict(torch.load('./board_segmentation_weights'))
     return model
@@ -84,7 +98,9 @@ def loss_func(preds, real):
     l6 = (d6[:, 0, :, :] - real).abs().sum()
     l7 = (d7[:, 0, :, :] - real).abs().sum()
 
-    return l1 + l2 + l3 + l4 + l5 + l6 + l7
+    scale = size * size
+
+    return (l1 * 2 + l2 + l3 + l4 + l5 + l6 + l7) / scale
 
 
 def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
@@ -98,7 +114,7 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
     for image, mask in train_ds:
         im = image.numpy().transpose(1, 2, 0)
         mk = mask.numpy()
-        im[mk == 0] = (im[mk == 0].astype(np.float32) * 0.4).astype(np.uint8)
+        im[mk == 0] = (im[mk == 0].astype(np.float32) * 0.3).astype(np.uint8)
 
         plt.imshow(im)
         plt.show()
@@ -137,15 +153,39 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
         im = image.numpy().transpose(1, 2, 0)
         mk = (preds[0][0, 0, :, :].cpu().detach().numpy() * 255).astype(np.uint8)
 
-        from corners import debug_corners
-        debug_corners(im, mk)
+        res = debug_corners(im, mk)
+        plt.imshow(res)
+        plt.show()
 
         i += 1
-        if (i > 20):
+        if (i > 15):
             break
 
-    torch.save(model.state_dict(), './board_segmentation_weights')
+    if not load_dict:
+        torch.save(model.state_dict(), './board_segmentation_weights')
+
+
+class Service(service.Service):
+    def __init__(self):
+        self.name = 'board_segmentation'
+        self.model = create_model(load_dict=False)
+        self.model.eval()
+        self.threshold = 0.9
+
+    def load_model(self, data):
+        self.model.load_state_dict(torch.load(bytes_as_file(data), map_location=torch.device('cpu')))
+
+    def _transform_in(self, input):
+        image = image_from_bytes(input[0])
+        return jit_transform(tensor_transform(image))
+
+    def _transform_out(self, result):
+        mask = (result[0, :, :] > self.threshold).astype(np.uint8) * 255
+        return serialize_array(find_corners(mask))
+
+    def _process_batch(self, data):
+        return self.model(torch.stack(data))[0].detach().numpy()
 
 
 if __name__ == '__main__':
-    train(30, lr=0.001, batch_size=12, limit=-1, load_dict=False)
+    train(24, lr=0.0003, batch_size=10, limit=-1, load_dict=False)
