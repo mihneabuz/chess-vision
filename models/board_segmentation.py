@@ -1,7 +1,7 @@
 import numpy as np
 import torch
-import torchvision.transforms.functional as TF
 import torchvision.transforms as T
+import torchvision.transforms.functional as TF
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 import cv2
@@ -53,6 +53,29 @@ def jit_transform(x):
     return TF.normalize(x / 255, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
 
+def create_model(load_dict=False):
+    model = u2net.U2NET()
+    if load_dict:
+        model.load_state_dict(torch.load('./board_segmentation_weights'))
+    return model
+
+
+def loss_func(preds, real):
+    (d1, d2, d3, d4, d5, d6, d7) = preds
+
+    l1 = (d1[:, 0, :, :] - real).abs().sum()
+    l2 = (d2[:, 0, :, :] - real).abs().sum()
+    l3 = (d3[:, 0, :, :] - real).abs().sum()
+    l4 = (d4[:, 0, :, :] - real).abs().sum()
+    l5 = (d5[:, 0, :, :] - real).abs().sum()
+    l6 = (d6[:, 0, :, :] - real).abs().sum()
+    l7 = (d7[:, 0, :, :] - real).abs().sum()
+
+    scale = size * size
+
+    return (l1 * 2 + l2 + l3 + l4 + l5 + l6 + l7) / scale
+
+
 def load_datasets(limit=-1):
     images = []
     masks = []
@@ -80,29 +103,6 @@ def load_datasets(limit=-1):
     return train, test
 
 
-def create_model(load_dict=False):
-    model = u2net.U2NET()
-    if load_dict:
-        model.load_state_dict(torch.load('./board_segmentation_weights'))
-    return model
-
-
-def loss_func(preds, real):
-    (d1, d2, d3, d4, d5, d6, d7) = preds
-
-    l1 = (d1[:, 0, :, :] - real).abs().sum()
-    l2 = (d2[:, 0, :, :] - real).abs().sum()
-    l3 = (d3[:, 0, :, :] - real).abs().sum()
-    l4 = (d4[:, 0, :, :] - real).abs().sum()
-    l5 = (d5[:, 0, :, :] - real).abs().sum()
-    l6 = (d6[:, 0, :, :] - real).abs().sum()
-    l7 = (d7[:, 0, :, :] - real).abs().sum()
-
-    scale = size * size
-
-    return (l1 * 2 + l2 + l3 + l4 + l5 + l6 + l7) / scale
-
-
 def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
     device = get_device()
 
@@ -110,8 +110,7 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
     train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     valid_dl = DataLoader(valid_ds, batch_size=2)
 
-    i = 0
-    for image, mask in train_ds:
+    for i, (image, mask) in enumerate(train_ds):
         im = image.numpy().transpose(1, 2, 0)
         mk = mask.numpy()
         im[mk == 0] = (im[mk == 0].astype(np.float32) * 0.3).astype(np.uint8)
@@ -119,7 +118,6 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
         plt.imshow(im)
         plt.show()
 
-        i += 1
         if (i > 5):
             break
 
@@ -147,8 +145,7 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
         valid_losses.append(criterion(preds, labels.to(device)).item())
     print(f'validation loss: {sum(valid_losses)}')
 
-    i = 0
-    for image, mask in valid_ds:
+    for i, (image, mask) in enumerate(valid_ds):
         preds = model(jit_transform(image)[None, :, :, :].to(device))
         im = image.numpy().transpose(1, 2, 0)
         mk = (preds[0][0, 0, :, :].cpu().detach().numpy() * 255).astype(np.uint8)
@@ -157,7 +154,6 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
         plt.imshow(res)
         plt.show()
 
-        i += 1
         if (i > 15):
             break
 
@@ -191,4 +187,4 @@ class Service(service.Service):
 
 
 if __name__ == '__main__':
-    train(24, lr=0.0003, batch_size=10, limit=-1, load_dict=False)
+    train(0, lr=0.0003, batch_size=10, limit=100, load_dict=True)

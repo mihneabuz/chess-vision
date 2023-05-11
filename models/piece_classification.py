@@ -1,22 +1,47 @@
 import numpy as np
 import torch
 import service as service
-from torchvision import models, transforms
-from torch.utils.data import DataLoader, random_split
+from torchvision import models
+import torchvision.transforms as T
+import torchvision.transforms.functional as TF
+from torch.utils.data import DataLoader
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from collections import Counter
-from random import randint
+import random
 
 from utils.load_data import load_data
 from utils.process import crop_board, crop_pieces
 from utils.utils import classes_dict, image_from_bytes, bytes_as_file, deserialize_array,\
     num_classes, get_device, serialize_values, train_loop, validation_metrics, summary, dataset
 
-normalize = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-augments = transforms.Compose([
-    transforms.RandomVerticalFlip(0.3),
-    transforms.RandomHorizontalFlip(0.5)
-])
+
+def augment(image, label):
+    size = image.shape[1]
+
+    if random.random() > 0.5:
+        angle = random.randint(-30, 30)
+        image = TF.rotate(image, angle, interpolation=T.InterpolationMode.BILINEAR)
+
+    if random.random() > 0.4:
+        image = TF.adjust_hue(image, random.randint(-1, 1) / 10)
+        image = TF.adjust_contrast(image, 1 + random.randint(-3, 3) / 10)
+
+    if random.random() > 0.8:
+        amount = random.randint(4, 24)
+        cropped = TF.center_crop(image, (size - amount, size - amount))
+        image = TF.resize(cropped, (size, size), antialias=None)
+
+    if random.random() > 0.9:
+        image = TF.gaussian_blur(image, 3)
+
+    if random.random() > 0.5:
+        image = TF.hflip(image)
+
+    if random.random() > 0.5:
+        image = TF.vflip(image)
+
+    return image, label
 
 
 def tensor_transform(image):
@@ -24,16 +49,29 @@ def tensor_transform(image):
 
 
 def jit_transform(x):
-    return normalize(x / 255)
-
-
-def augment(x):
-    return augments(jit_transform(x))
+    return TF.normalize(x / 255, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
 
 def set_grad(model, requires_grad):
     for param in model.parameters():
         param.requires_grad = requires_grad
+
+
+def create_model(load_dict=False, pretrained=False):
+    if pretrained:
+        model = models.efficientnet_b2(weights=models.EfficientNet_B2_Weights.DEFAULT)
+    else:
+        model = models.efficientnet_b2()
+        if load_dict:
+            model.load_state_dict(torch.load('./piece_classification_weights'))
+
+    last_layer_size = model.classifier[-1].__getattribute__('out_features')
+    model.classifier.append(torch.nn.Linear(in_features=last_layer_size, out_features=num_classes))
+    return model
+
+
+def results(preds):
+    return torch.argmax(preds, dim=1)
 
 
 def load_board_images(max=-1):
@@ -73,7 +111,7 @@ def load_datasets(limit=-1, balance=True):
 
         for image, label in zip(pieces_images, pieces_labels):
             if label == 'empty':
-                if randint(0, 100) < drop_chance:
+                if random.randint(0, 100) < drop_chance:
                     balanced_pieces_images.append(image)
                     balanced_pieces_labels.append(label)
                 else:
@@ -95,32 +133,14 @@ def load_datasets(limit=-1, balance=True):
     pieces_classes = [classes_dict[label] for label in pieces_labels]
 
     size = len(pieces_images)
-    train_size = int(size * 0.7)
+    train_size = int(size * 0.8)
     valid_size = size - train_size
 
-    return random_split(dataset(pieces_images, pieces_classes), [train_size, valid_size])
+    train_im, test_im, train_mk, test_mk = train_test_split(pieces_images, pieces_classes, test_size=valid_size)
+    train = dataset(train_im, train_mk, augment=augment)
+    test = dataset(test_im, test_mk)
 
-
-def create_model(pretrained=True):
-    if pretrained:
-        model = models.efficientnet_b2(weights=models.EfficientNet_B2_Weights.DEFAULT)
-    else:
-        model = models.efficientnet_b2()
-    last_layer_size = model.classifier[-1].__getattribute__('out_features')
-    model.classifier.append(torch.nn.Linear(in_features=last_layer_size, out_features=num_classes))
-    return model
-
-
-def load_model():
-    model = create_model(pretrained=False)
-    model.load_state_dict(torch.load('./piece_classification_weights'))
-    return model
-
-
-def inference():
-    model = load_model()
-    model.eval()
-    return lambda img: model(jit_transform(tensor_transform(img))[None, :, :, :]).detach().numpy()
+    return train, test
 
 
 def train(epochs, lr=0.0001, batch_size=64, limit=-1, load_dict=False):
@@ -130,11 +150,14 @@ def train(epochs, lr=0.0001, batch_size=64, limit=-1, load_dict=False):
     train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     valid_dl = DataLoader(valid_ds, batch_size=batch_size)
 
-    if load_dict:
-        model = load_model()
-    else:
-        model = create_model()
+    for i, (image, label) in enumerate(train_ds):
+        plt.imshow(image.numpy().transpose(1, 2, 0))
+        plt.show()
 
+        if (i > 3):
+            break
+
+    model = create_model(load_dict=load_dict, pretrained=not load_dict)
     model.to(device)
     summary(model, (3, 128, 128))
 
@@ -150,15 +173,14 @@ def train(epochs, lr=0.0001, batch_size=64, limit=-1, load_dict=False):
     losses = []
     for i in range(epochs):
         print(f'epoch {i + 1}')
-        curr_losses = train_loop(model, train_dl, optimizer, criterion, transform=augment)
+        curr_losses = train_loop(model, train_dl, optimizer, criterion, transform=jit_transform)
         print(f'loss: {sum(curr_losses)}')
         losses += curr_losses
 
     plt.plot(losses)
     plt.show()
 
-    metrics = validation_metrics(model, valid_dl, transform=jit_transform,
-                                 results=lambda preds: torch.argmax(preds, dim=1))
+    metrics = validation_metrics(model, valid_dl, transform=jit_transform, results=results)
     accuracy, f1, precision, recall = metrics
     print(f'accuracy: {accuracy:.4f}\nf1 score: {f1:.4f}')
 
@@ -184,8 +206,6 @@ class Service(service.Service):
 
         try:
             board = crop_board(image, corners, flag=True)
-            plt.imshow(board)
-            plt.show()
             pieces, _ = crop_pieces(board)
             return torch.stack([jit_transform(tensor_transform(piece)) for piece in pieces])
         except Exception as e:
@@ -201,4 +221,4 @@ class Service(service.Service):
 
 
 if __name__ == "__main__":
-    train(6, batch_size=32, limit=-1, load_dict=False)
+    train(16, batch_size=32, limit=-1, load_dict=False)
