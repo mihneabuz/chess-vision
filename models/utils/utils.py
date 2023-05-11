@@ -114,6 +114,10 @@ def image_from_bytes(bytes: bytes) -> np.ndarray:
     return cv2.imdecode(np.frombuffer(bytes, np.uint8), cv2.IMREAD_COLOR)
 
 
+def image_to_bytes(image: np.ndarray) -> bytes:
+    return cv2.imencode('.jpg', image)[1].tobytes()
+
+
 def serialize_array(ndarray: np.ndarray) -> bytes:
     memfile = BytesIO()
     np.save(memfile, ndarray)

@@ -69,7 +69,11 @@ def unprojectCropFromRelativeCoords(img_, cx, outputShape, growthFactor = 0.0):
 
     return cv2.warpPerspective(img_, M, outputShape, flags=cv2.INTER_LINEAR)
 
-def crop_board(image, corners):
+def crop_board(image, corners, flag=False):
+    if flag:
+        for c in corners:
+            c[1] = 1 - c[1]
+
     return unprojectCropFromRelativeCoords(image, corners, boardImgSize, IMAGE_GROWTH_FACTOR)
 
 # TODO: study and cleanup these functions
@@ -101,6 +105,15 @@ def crop_pieces(image, pieces=None):
 
     image = None
     return images, labels
+
+
+def translate_pieces(pieces):
+    labels = []
+    for cell in cells:
+        labels.append(pieces.get(cell, 'empty'))
+
+    return labels
+
 
 if __name__ == "__main__":
     from load_data import load_data

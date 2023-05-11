@@ -4,14 +4,13 @@ from sys import argv
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
+import gc as gc
 
 from board_detection import Service as BoardDetection
 from piece_classification import Service as PieceClassification
 from board_segmentation import Service as BoardSegmentation
-from utils.process import crop_board, crop_pieces
-from utils.utils import deserialize_array, serialize_array, deserialize_values, image_from_bytes
-
-size = 160
+from utils.process import crop_board, crop_pieces, translate_pieces
+from utils.utils import deserialize_array, serialize_array, deserialize_values, image_from_bytes, image_to_bytes, classes_dict
 
 
 def add_corners(image, corners):
@@ -57,21 +56,9 @@ def print_board(pieces):
     print(GRAY + '----------------------------------' + END)
 
 
-if __name__ == '__main__':
-    file = argv[1]
-
-    board_detection = BoardDetection()
-    board_segmentation = BoardSegmentation()
-    piece_classification = PieceClassification()
-
-    with open('./board_detection_weights', 'rb') as w:
-        board_detection.load_model(w.read())
-
-    with open('./board_segmentation_weights', 'rb') as w:
-        board_segmentation.load_model(w.read())
-
-    with open('./piece_classification_weights', 'rb') as w:
-        piece_classification.load_model(w.read())
+def visualize_single(models):
+    [board_detection, board_segmentation, piece_classification] = models
+    file = argv[2]
 
     image_bytes = None
     with open(file, 'rb') as image:
@@ -86,13 +73,13 @@ if __name__ == '__main__':
     plt.show()
 
     seg_corners = board_segmentation.process([input1, input1])
-    plt.imshow(add_corners(image, deserialize_array(seg_corners[0])))
+    plt.imshow(add_corners(image, stack_corners(deserialize_array(seg_corners[0]))))
     plt.show()
 
-    corners = np.array(deserialize_array(seg_corners[0]))
-    corners[:, 1] = 1 - corners[:, 1]
+    corners = stack_corners(deserialize_array(seg_corners[0]))
+    print(corners)
 
-    cropped = crop_board(image, corners)
+    cropped = crop_board(image, corners, flag=True)
     pieces, _ = crop_pieces(cropped)
     fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(4, 4))
     for i, axi in enumerate(ax.flat):
@@ -100,7 +87,7 @@ if __name__ == '__main__':
     plt.tight_layout()
     plt.show()
 
-    input3 = (image_bytes, serialize_array(np.array(unstack_corners(corners)).astype(np.float32)))
+    input3 = (image_bytes, seg_corners[0])
     result3 = piece_classification.process([input3, input3])
 
     found = deserialize_values(result3[0], 64, np.uint8)
@@ -109,3 +96,64 @@ if __name__ == '__main__':
 
     plt.imshow(cropped)
     plt.show()
+
+
+def evaluate(models):
+    [_, board_segmentation, piece_classification] = models
+    count = int(argv[2])
+
+    from utils.load_data import load_data
+
+    images = []
+    for image, annotations in load_data(max=count):
+        pieces = [classes_dict[label] for label in translate_pieces(annotations["config"])]
+        images.append((image_to_bytes(image), pieces))
+
+    gc.collect()
+
+    input1 = [(image[0], bytes()) for image in images]
+    result1 = board_segmentation.process(input1)
+
+    errors = len([0 for res in result1 if len(res) == 0])
+    images = [images[i] for i in range(len(images)) if len(result1[i]) > 0]
+    print('Unable to find corners: ', errors)
+
+    input2 = [(images[i][0], result1[i]) for i in range(len(images)) if len(result1[i]) > 0]
+    result2 = piece_classification.process(input2)
+
+    errors = len([0 for res in result2 if len(res) == 0])
+    images = [images[i] for i in range(len(images)) if len(result2[i]) > 0]
+    print('Unable to crop board: ', errors)
+
+    found = [deserialize_values(data, 64, np.uint8) for data in result2 if len(data) > 0]
+    for i in range(len(images)):
+        print(list(reversed(found[i].tolist())))
+        print(images[i][1])
+        count = len([0 for j in range(64) if images[i][1][j] == found[i][63 - j]])
+        print('accuracy: ', count / 64)
+        print('-------------------')
+
+
+if __name__ == '__main__':
+    mode = argv[1]
+
+    board_detection = BoardDetection()
+    board_segmentation = BoardSegmentation(maskSize=128, quality=0.3)
+    piece_classification = PieceClassification()
+
+    with open('./board_detection_weights', 'rb') as w:
+        board_detection.load_model(w.read())
+
+    with open('./board_segmentation_weights', 'rb') as w:
+        board_segmentation.load_model(w.read())
+
+    with open('./piece_classification_weights', 'rb') as w:
+        piece_classification.load_model(w.read())
+
+    models = [board_detection, board_segmentation, piece_classification]
+
+    if mode == "single":
+        visualize_single(models)
+
+    if mode == "eval":
+        evaluate(models)

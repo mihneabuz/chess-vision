@@ -180,9 +180,17 @@ class Service(service.Service):
 
     def _transform_in(self, input):
         image = image_from_bytes(input[0])
-        corners = deserialize_array(input[1])
-        pieces, _ = crop_pieces(crop_board(image, np.array_split(corners, 4)))
-        return torch.stack([jit_transform(tensor_transform(piece)) for piece in pieces])
+        corners = np.array_split(deserialize_array(input[1]), 4)
+
+        try:
+            board = crop_board(image, corners, flag=True)
+            plt.imshow(board)
+            plt.show()
+            pieces, _ = crop_pieces(board)
+            return torch.stack([jit_transform(tensor_transform(piece)) for piece in pieces])
+        except Exception as e:
+            print('bad corners', e, corners)
+            return None
 
     def _transform_out(self, result):
         preds = result.detach().numpy().astype(np.uint8)

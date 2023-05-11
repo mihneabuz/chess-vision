@@ -19,5 +19,20 @@ class Service:
         return data
 
     def process(self, inputs):
-        results = self._process_batch([self._transform_in(input) for input in inputs])
-        return [self._transform_out(result) for result in results]
+        if len(inputs) <= 20:
+            transformed = [self._transform_in(input) for input in inputs]
+            filtered = [input for input in transformed if input is not None]
+            results = [self._transform_out(result) for result in self._process_batch(filtered)]
+
+            i = 0
+            for j in range(len(transformed)):
+                if transformed[j] is not None:
+                    transformed[j] = results[i]
+                    i += 1
+
+            return [bytes() if result is None else result for result in transformed]
+
+        results = []
+        for i in range(0, len(inputs), 20):
+            results += self.process(inputs[i:i + 20])
+        return results

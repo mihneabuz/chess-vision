@@ -166,11 +166,13 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
 
 
 class Service(service.Service):
-    def __init__(self):
+    def __init__(self, maskSize=128, quality=0.3):
         self.name = 'board_segmentation'
         self.model = create_model(load_dict=False)
         self.model.eval()
         self.threshold = 0.9
+        self.quality = quality
+        self.maskSize = maskSize
 
     def load_model(self, data):
         self.model.load_state_dict(torch.load(bytes_as_file(data), map_location=torch.device('cpu')))
@@ -181,7 +183,8 @@ class Service(service.Service):
 
     def _transform_out(self, result):
         mask = (result[0, :, :] > self.threshold).astype(np.uint8) * 255
-        return serialize_array(find_corners(mask))
+        corners = find_corners(mask, downscale=self.maskSize, quality=self.quality).flatten()
+        return serialize_array(corners) if len(corners) else None
 
     def _process_batch(self, data):
         return self.model(torch.stack(data))[0].detach().numpy()
