@@ -21,6 +21,7 @@ type State = Upload | Waiting | Result;
 
 export default function Home() {
   const [state, setState] = useState<State>({ type: 'upload' });
+  const [error, setError] = useState<string>("");
 
   useEffect(() => {
     if (state.type === 'waiting') {
@@ -28,7 +29,13 @@ export default function Home() {
         const req = await fetch(`/api/check/${state.id}`);
         const result = await req.json();
 
-        if (result.success) {
+        console.log(result)
+        if (result.done) {
+          if (!result.success) {
+            setState({ type: 'upload' });
+            setError(result.message);
+          }
+
           setState({ type: 'result', pieces: result.pieces });
         }
       }, 500);

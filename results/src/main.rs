@@ -2,7 +2,7 @@ mod utils;
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 
 use axum::extract::{Path, State};
 use axum::routing::get;
@@ -11,7 +11,7 @@ use axum::{Json, Router, Server};
 use futures::StreamExt;
 use lapin::options::BasicConsumeOptions;
 use lapin::types::FieldTable;
-use lapin::{Connection, ConnectionProperties, Consumer, Result};
+use lapin::{self, Connection, ConnectionProperties, Consumer};
 use serde::{Deserialize, Serialize};
 use tokio_retry::Retry;
 
@@ -23,29 +23,69 @@ pub struct Message {
     pub data: Vec<u8>,
 }
 
-#[derive(Serialize, Debug)]
-pub struct Response {
-    pub success: bool,
-    #[serde(with = "serde_bytes")]
-    pub pieces: Option<Vec<u8>>,
+#[derive(Deserialize, Debug)]
+pub struct ErrorMessage {
+    pub id: String,
+    pub message: String,
 }
 
-type Results = Arc<RwLock<HashMap<String, [u8; 64]>>>;
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum PayloadResult {
+    #[serde(with = "serde_bytes")]
+    Pieces(Vec<u8>),
+    Error(String)
+}
+
+#[derive(Serialize, Debug)]
+pub struct Payload {
+    pub success: bool,
+    #[serde(flatten)]
+    pub result: PayloadResult
+}
+
+#[derive(Serialize, Debug)]
+pub struct Response {
+    pub done: bool,
+    #[serde(flatten)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload: Option<Payload>
+}
+
+type Results = Arc<Mutex<HashMap<String, Result<[u8; 64], String>>>>;
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    let results: Results = Arc::new(RwLock::new(HashMap::new()));
+async fn main() -> lapin::Result<()> {
+    let results: Results = Arc::new(Mutex::new(HashMap::new()));
 
     let results_ref = Arc::clone(&results);
     tokio::spawn(async move {
-        let mut consumer = get_consumer().await.expect("Could not connect to final stage");
+        let mut consumer = get_consumer(&utils::amqp_addr(), &utils::queue())
+            .await
+            .expect("Could not connect to final stage");
 
         while let Some(delivery) = consumer.next().await {
             if let Ok(Ok(message)) = delivery.map(|d| serde_json::from_slice::<Message>(&d.data)) {
                 results_ref
-                    .write()
+                    .lock()
                     .unwrap()
-                    .insert(message.id, message.data.try_into().unwrap());
+                    .insert(message.id, Ok(message.data.try_into().unwrap()));
+            }
+        }
+    });
+
+    let results_ref = Arc::clone(&results);
+    tokio::spawn(async move {
+        let mut consumer = get_consumer(&utils::amqp_addr(), &utils::fail_queue())
+            .await
+            .expect("Could not connect to fail queue");
+
+        while let Some(delivery) = consumer.next().await {
+            if let Ok(Ok(message)) = delivery.map(|d| serde_json::from_slice::<ErrorMessage>(&d.data)) {
+                results_ref
+                    .lock()
+                    .unwrap()
+                    .insert(message.id, Err(message.message));
             }
         }
     });
@@ -64,33 +104,43 @@ async fn main() -> Result<()> {
 }
 
 async fn root(State(results): State<Results>, Path(id): Path<String>) -> Json<Response> {
-    match results.read().unwrap().get(&id) {
-        Some(result) => Json(Response {
-            success: true,
-            pieces: Some(result.clone().try_into().unwrap()),
+    let item = results.lock().unwrap().remove(&id);
+    match item {
+        Some(Ok(pieces)) => Json(Response {
+            done: true,
+            payload: Some(Payload {
+                success: true,
+                result: PayloadResult::Pieces(pieces.into())
+            })
+        }),
+        Some(Err(message)) => Json(Response {
+            done: true,
+            payload: Some(Payload {
+                success: false,
+                result: PayloadResult::Error(message)
+            })
         }),
         None => Json(Response {
-            success: false,
-            pieces: None,
+            done: false,
+            payload: None
         }),
     }
 }
 
-async fn get_consumer() -> Result<Consumer> {
+async fn get_consumer(addr: &str, queue: &str) -> lapin::Result<Consumer> {
     let retry_strategy = utils::retry_strategy();
 
     let conn = Retry::spawn(retry_strategy.clone(), || async {
-        Connection::connect(&utils::amqp_addr(), ConnectionProperties::default()).await
+        Connection::connect(addr, ConnectionProperties::default()).await
     })
     .await?;
 
     println!("connected to message queue");
 
-    let message_queue = utils::queue();
     let (opts, table) = (BasicConsumeOptions::default(), FieldTable::default());
     let consumer = Retry::spawn(retry_strategy, || async {
         let channel = conn.create_channel().await?;
-        channel.basic_consume(&message_queue, "service", opts, table.clone()).await
+        channel.basic_consume(queue, "service", opts, table.clone()).await
     })
     .await?;
 

@@ -12,6 +12,10 @@ pub fn queue() -> String {
     env::var("QUEUE").expect("QUEUE variable not set")
 }
 
+pub fn fail_queue() -> String {
+    env::var("FAIL_QUEUE").expect("FAIL_QUEUE variable not set")
+}
+
 pub fn retry_strategy() -> Map<FixedInterval, fn(Duration) -> Duration> {
     FixedInterval::from_millis(500).map(jitter)
 }

@@ -28,6 +28,10 @@ pub fn next_queue() -> String {
     env::var("NEXT_QUEUE").expect("NEXT_QUEUE variable not set")
 }
 
+pub fn fail_queue() -> String {
+    env::var("FAIL_QUEUE").expect("FAIL_QUEUE variable not set")
+}
+
 pub fn file_server() -> String {
     env::var("FILE_SERVER").unwrap_or(String::from("127.0.0.1"))
 }

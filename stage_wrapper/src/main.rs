@@ -6,7 +6,7 @@ mod wrapper;
 use bytes::Bytes;
 use futures::join;
 use lapin::Result;
-use message::{connect, consumer, publisher, Message};
+use message::{connect, consumer, publisher, FailMessage, Message, StageResult};
 
 use crate::file::fetch_file_sync;
 
@@ -14,14 +14,15 @@ use tokio_retry::Retry;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("starting stage {:?}", utils::model_name());
+    let stage = utils::model_name();
+    println!("starting stage {:?}", stage);
 
     let conn = Box::leak(Box::new(Retry::spawn(utils::retry_strategy(), connect).await?));
 
     println!("connected to message queue");
 
     let (consume_sender, consume_receiver) = std::sync::mpsc::channel::<(Message, Bytes)>();
-    let (publish_sender, publish_receiver) = tokio::sync::mpsc::unbounded_channel::<Message>();
+    let (publish_sender, publish_receiver) = tokio::sync::mpsc::unbounded_channel::<StageResult>();
 
     let worker = tokio::task::spawn_blocking(move || {
         let service = wrapper::create(utils::service_type()).expect("could not load service");
@@ -48,7 +49,14 @@ async fn main() -> Result<()> {
 
                 messages.drain(..).map(|m| m.0).zip(result.into_iter()).for_each(
                     |(message, data)| {
-                        publish_sender.send(Message::new(message.id, message.hash, data)).unwrap();
+                        let result = if data.len() > 0 {
+                            Ok(Message::new(message.id, message.hash, data))
+                        } else {
+                            let err = format!("processing failed on {}", stage);
+                            Err(FailMessage::new(message.id, err))
+                        };
+
+                        publish_sender.send(result).unwrap();
                     },
                 );
             }

@@ -1,5 +1,6 @@
 __pycache__
 boards
+test
 *_weights
 test.py
 requirements.txt

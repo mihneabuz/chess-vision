@@ -131,7 +131,7 @@ function Piece({ index, type, onClick, onRightClick }) {
     <div
       className={`flex aspect-square min-w-[4rem] items-center justify-center ${color}`}
       onClick={() => onClick(index)}
-      onContextMenu={(e) => { e.preventDefault(); onRightClick(e, index)}}
+      onContextMenu={(e) => { e.preventDefault(); onRightClick(e, index) }}
     >
       {piece && <img className="w-full opacity-80" src={piece.src} />}
     </div>
@@ -212,9 +212,9 @@ function Arrow({ from, to }) {
     const yOffset = from.y === to.y ? 10 : 0;
 
     style = {
-      left:   Math.min(from.x, to.x) - xOffset,
-      top:    Math.min(from.y, to.y) - yOffset + offset,
-      width:  Math.abs(from.x - to.x) + 2 * xOffset,
+      left: Math.min(from.x, to.x) - xOffset,
+      top: Math.min(from.y, to.y) - yOffset + offset,
+      width: Math.abs(from.x - to.x) + 2 * xOffset,
       height: Math.abs(from.y - to.y) + 2 * yOffset,
     };
 

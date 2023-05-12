@@ -25,6 +25,20 @@ impl Message {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+pub struct FailMessage {
+    pub id: String,
+    pub message: String,
+}
+
+impl FailMessage {
+    pub fn new(id: String, message: String) -> Self {
+        Self { id, message }
+    }
+}
+
+pub type StageResult = std::result::Result<Message, FailMessage>;
+
 pub async fn connect() -> Result<Connection> {
     Connection::connect(&utils::amqp_addr(), ConnectionProperties::default()).await
 }
@@ -61,7 +75,7 @@ pub async fn consumer(conn: &Connection, sender: Sender<(Message, Bytes)>) -> Re
     Ok(())
 }
 
-pub async fn publisher(conn: &Connection, mut receiver: UnboundedReceiver<Message>) -> Result<()> {
+pub async fn publisher(conn: &Connection, mut receiver: UnboundedReceiver<StageResult>) -> Result<()> {
     let channel = conn.create_channel().await?;
 
     let message_queue = utils::next_queue();
@@ -69,21 +83,39 @@ pub async fn publisher(conn: &Connection, mut receiver: UnboundedReceiver<Messag
         .queue_declare(&message_queue, QueueDeclareOptions::default(), FieldTable::default())
         .await?;
 
-    println!("declared queue {}", message_queue);
+    let fail_queue = utils::fail_queue();
+    channel
+        .queue_declare(&fail_queue, QueueDeclareOptions::default(), FieldTable::default())
+        .await?;
 
     loop {
         let message = receiver.recv().await.unwrap();
-        let payload = serde_json::to_vec(&message).unwrap();
-        println!("{:?}", message);
-        channel
-            .basic_publish(
-                "",
-                &message_queue,
-                BasicPublishOptions::default(),
-                &payload,
-                BasicProperties::default(),
-            )
-            .await?
-            .await?;
+        match message {
+            Ok(res) => {
+                channel
+                    .basic_publish(
+                        "",
+                        &message_queue,
+                        BasicPublishOptions::default(),
+                        &serde_json::to_vec(&res).unwrap(),
+                        BasicProperties::default(),
+                    )
+                    .await?
+                    .await?;
+            }
+
+            Err(err) => {
+                channel
+                    .basic_publish(
+                        "",
+                        &message_queue,
+                        BasicPublishOptions::default(),
+                        &serde_json::to_vec(&err).unwrap(),
+                        BasicProperties::default(),
+                    )
+                    .await?
+                    .await?;
+            }
+        }
     }
 }
