@@ -7,6 +7,7 @@ import { useEaseIn } from 'app/hooks';
 
 interface Upload {
   type: 'upload';
+  error?: boolean;
 }
 interface Waiting {
   type: 'waiting';
@@ -21,7 +22,6 @@ type State = Upload | Waiting | Result;
 
 export default function Home() {
   const [state, setState] = useState<State>({ type: 'upload' });
-  const [error, setError] = useState<string>("");
 
   useEffect(() => {
     if (state.type === 'waiting') {
@@ -29,14 +29,13 @@ export default function Home() {
         const req = await fetch(`/api/check/${state.id}`);
         const result = await req.json();
 
-        console.log(result)
         if (result.done) {
-          if (!result.success) {
-            setState({ type: 'upload' });
-            setError(result.message);
+          if (result.success) {
+            setState({ type: 'result', pieces: result.pieces });
+          } else {
+            setState({ type: 'upload', error: true });
+            console.warn(result.message);
           }
-
-          setState({ type: 'result', pieces: result.pieces });
         }
       }, 500);
 
@@ -55,7 +54,7 @@ export default function Home() {
       </div>
 
       <div className="max-w-2xl shrink grow">
-        {state.type === 'upload' && <Greeting />}
+        {state.type === 'upload' && (state.error ? <Error /> : <Greeting />)}
 
         {state.type === 'waiting' && <Progress message={'Processing'} />}
 
@@ -85,6 +84,14 @@ function Greeting() {
       </span>
     </div>
   );
+}
+
+function Error() {
+  return (
+    <div className="flex flex-row items-center justify-center text-2xl">
+      Sorry, something went wrong :(
+    </div>
+  )
 }
 
 function Upload({ onUpload, canUpload }) {

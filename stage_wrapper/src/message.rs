@@ -108,7 +108,7 @@ pub async fn publisher(conn: &Connection, mut receiver: UnboundedReceiver<StageR
                 channel
                     .basic_publish(
                         "",
-                        &message_queue,
+                        &fail_queue,
                         BasicPublishOptions::default(),
                         &serde_json::to_vec(&err).unwrap(),
                         BasicProperties::default(),

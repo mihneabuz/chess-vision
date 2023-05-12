@@ -11,7 +11,7 @@ def find_corners(mk, downscale=None, quality=0.3, infer=False):
         mk = cv2.resize(mk, (downscale, downscale), interpolation=cv2.INTER_NEAREST)
 
     size = mk.shape[0]
-    corners = cv2.goodFeaturesToTrack(mk, 4, quality, size / 4, useHarrisDetector=True).astype(np.int32)
+    corners = cv2.goodFeaturesToTrack(mk, 4, quality, size / 4, useHarrisDetector=True)
 
     if corners is None or len(corners) > 4 or len(corners) < 3:
         return np.array([])
