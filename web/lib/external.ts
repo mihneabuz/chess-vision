@@ -24,7 +24,7 @@ async function sendFile(file: File, name: string) {
 async function publishId(id: string, hash: string) {
   const connection = await amqplib.connect(`amqp://${config.messageBroker}`);
   const channel = await connection.createChannel();
-  await channel.assertQueue(config.messageQueue);
+  await channel.assertQueue(config.messageQueue, { durable: false });
 
   const message = JSON.stringify({
     id,

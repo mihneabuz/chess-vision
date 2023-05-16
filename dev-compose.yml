@@ -4,7 +4,6 @@ services:
   web-frontend:
     container_name: web
     build:
-      dockerfile: Dockerfile
       context: ./web
     ports:
       - 80:3000
@@ -48,14 +47,14 @@ services:
   board_segmentation:
     container_name: board_seg
     build:
-      dockerfile: Dockerfile
-      context: ./stage_wrapper
+      dockerfile: ./stage/Dockerfile
+      context: ./backend
     environment:
       SERVICE_TYPE: python
+      MODULES_PATH: /model
       MODEL_NAME: board_segmentation
       FILE_SERVER: file-server
       FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
-      MODULES_PATH: /model
       MESSAGE_BROKER: rabbitmq
       CURRENT_QUEUE: stage1
       NEXT_QUEUE: stage2
@@ -67,14 +66,14 @@ services:
   piece_classification:
     container_name: piece_class
     build:
-      dockerfile: Dockerfile
-      context: ./stage_wrapper
+      dockerfile: ./stage/Dockerfile
+      context: ./backend
     environment:
       SERVICE_TYPE: python
+      MODULES_PATH: /model
       MODEL_NAME: piece_classification
       FILE_SERVER: file-server
       FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
-      MODULES_PATH: /model
       MESSAGE_BROKER: rabbitmq
       CURRENT_QUEUE: stage2
       NEXT_QUEUE: stage3
@@ -86,8 +85,8 @@ services:
   results:
     container_name: results
     build:
-      dockerfile: Dockerfile
-      context: ./results
+      dockerfile: ./results/Dockerfile
+      context: ./backend
     environment:
       MESSAGE_BROKER: rabbitmq
       QUEUE: stage3
@@ -100,8 +99,7 @@ services:
   engine:
     container_name: engine
     build:
-      dockerfile: Dockerfile
-      context: ./engine
+      context: ./backend/engine
     ports:
       - 3001:80
     links:

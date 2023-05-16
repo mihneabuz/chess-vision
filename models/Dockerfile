@@ -1,4 +1,4 @@
-from python:3.10-buster as BASE
+from python:3.9-bullseye as BASE
 
 RUN apt update
 RUN apt install -y libgl1

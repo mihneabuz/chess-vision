@@ -1,12 +1,11 @@
-FROM rust:latest AS rust-stockfish
+FROM rust:latest AS stockfish-builder
 
 RUN git clone https://github.com/official-stockfish/Stockfish.git
 WORKDIR Stockfish
 RUN make -C src -j build ARCH=x86-64-modern
-RUN mv src/stockfish /
-WORKDIR /
 
-FROM rust-stockfish as builder
+
+FROM rust:latest as rust-deps
 
 WORKDIR app
 
@@ -20,7 +19,8 @@ RUN cargo build --release
 
 RUN rm -r ./src/*
 
-from builder as runner
+
+from rust-deps as rust-builder
 
 COPY ./src ./src
 
@@ -28,6 +28,14 @@ RUN touch -a -m ./src/main.rs
 
 RUN cargo build --release
 
+
+from debian:bullseye-slim as runner
+
+WORKDIR /app
+
+COPY --from=stockfish-builder /Stockfish/src/stockfish /stockfish
+COPY --from=rust-builder /app/target/release/engine /engine
+
 ENV STOCKFISH=/stockfish
 
-CMD [ "./target/release/engine" ]
+CMD [ "/engine" ]
