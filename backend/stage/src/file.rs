@@ -1,34 +1,30 @@
-use crate::utils;
-
-use std::io;
-
 use bytes::Bytes;
-use reqwest::Result;
+use lazy_static::lazy_static;
+use reqwest::{Result, Client};
+
+lazy_static! {
+    static ref CLIENT: Client = Client::new();
+    static ref FILE_SERVER: String = crate::utils::file_server();
+    static ref FILE_TOKEN: String = crate::utils::file_server_token();
+}
 
 pub async fn fetch_image(id: &str) -> Result<Bytes> {
-    let file_server = utils::file_server();
-    let token = utils::file_server_token();
+    fetch_file(&format!("image_{}", id)).await
+}
 
-    let url = format!("http://{}/files/image_{}?token={}", file_server, id, token);
+pub async fn fetch_file(filename: &str) -> Result<Bytes> {
+    let file_server = FILE_SERVER.as_str();
+    let token = FILE_TOKEN.as_str();
 
-    let response = reqwest::get(url).await?;
+    let url = format!("http://{}/files/{}?token={}", file_server, filename, token);
+
+    let response = CLIENT.get(url).send().await?;
     let content = response.bytes().await?;
 
     Ok(content)
 }
 
-pub fn fetch_file_sync(filename: &str) -> io::Result<Vec<u8>> {
-    let file_server = utils::file_server();
-    let token = utils::file_server_token();
-
-    let url = format!("http://{}/files/{}?token={}", file_server, filename, token);
-
-    let response = ureq::get(&url)
-        .call()
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
-
-    let mut buf = Vec::with_capacity(4096);
-    response.into_reader().read_to_end(&mut buf)?;
-
-    Ok(buf)
+pub fn fetch_file_sync(filename: &str) -> Result<Bytes> {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(fetch_file(filename))
 }
