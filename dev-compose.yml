@@ -15,6 +15,7 @@ services:
     links:
       - file-server
       - rabbitmq
+      - upload
       - results
       - engine
 
@@ -44,6 +45,21 @@ services:
       - rabbit-storage:/var/lib/rabbitmq/
       - rabbit-logs:/var/log/rabbitmq
 
+  upload:
+    container_name: upload
+    build:
+      dockerfile: ./upload/Dockerfile
+      context: ./backend
+    environment:
+      FILE_SERVER: file-server
+      FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
+      MESSAGE_BROKER: rabbitmq
+      QUEUE: stage1
+    ports:
+      - 3000:80
+    links:
+      - rabbitmq
+
   board_segmentation:
     container_name: board_seg
     build:
@@ -51,7 +67,6 @@ services:
       context: ./backend
     environment:
       SERVICE_TYPE: python
-      MODULES_PATH: /model
       MODEL_NAME: board_segmentation
       FILE_SERVER: file-server
       FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
@@ -70,7 +85,6 @@ services:
       context: ./backend
     environment:
       SERVICE_TYPE: python
-      MODULES_PATH: /model
       MODEL_NAME: piece_classification
       FILE_SERVER: file-server
       FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
@@ -92,7 +106,7 @@ services:
       QUEUE: stage3
       FAIL_QUEUE: fail
     ports:
-      - 3000:80
+      - 3001:80
     links:
       - rabbitmq
 
@@ -101,7 +115,7 @@ services:
     build:
       context: ./backend/engine
     ports:
-      - 3001:80
+      - 3002:80
     links:
       - rabbitmq
 

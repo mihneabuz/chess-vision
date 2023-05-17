@@ -1,0 +1,20 @@
+[package]
+name = "upload"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+shared = { path = "../shared"}
+
+axum = { version = "0.6", features = ["multipart"] }
+bytes = "1.4"
+futures = "0.3"
+md5 = "0.7"
+reqwest = { version = "0.11", features = ["multipart"] }
+lazy_static = "1.4"
+tokio = { version = "1.28", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+ulid = "1.0"

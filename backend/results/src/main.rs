@@ -2,7 +2,8 @@ mod utils;
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use axum::{
     extract::{Path, State},
@@ -48,7 +49,7 @@ async fn main() {
         consumer(conn, &utils::queue(), |message: Message| async {
             results_ref
                 .lock()
-                .unwrap()
+                .await
                 .insert(message.id, Ok(message.data.try_into().unwrap()));
         })
         .await
@@ -58,10 +59,7 @@ async fn main() {
     let results_ref = Arc::clone(&results);
     tokio::spawn(async move {
         consumer(conn, &utils::fail_queue(), |error: ErrorMessage| async {
-            results_ref
-                .lock()
-                .unwrap()
-                .insert(error.id, Err(error.message));
+            results_ref.lock().await.insert(error.id, Err(error.message));
         })
         .await
         .expect("error queue failed");
@@ -79,7 +77,7 @@ async fn main() {
 }
 
 async fn root(State(results): State<Results>, Path(id): Path<String>) -> Json<Response> {
-    let item = results.lock().unwrap().remove(&id);
+    let item = results.lock().await.remove(&id);
     match item {
         Some(Ok(pieces)) => Json(Response {
             done: true,
