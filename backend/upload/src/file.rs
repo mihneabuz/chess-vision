@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 use bytes::Bytes;
 use lazy_static::lazy_static;
 use reqwest::{
@@ -30,6 +32,17 @@ pub async fn handle_image(image: Bytes, id: &str) -> Option<String> {
     Some(hash)
 }
 
-fn prepare_image(image: Bytes) -> Option<Vec<u8>> {
-    Some(image.to_vec())
+fn prepare_image(bytes: Bytes) -> Option<Vec<u8>> {
+    let mut im = image::load_from_memory(&bytes).ok()?;
+    let (w, h) = (im.width(), im.height());
+
+    let size = w.min(h);
+    let (x, y) = ((w - size) / 2, (h - size) / 2);
+
+    im = im.crop(x, y, size, size);
+
+    let mut cursor = Cursor::new(Vec::new());
+    im.write_to(&mut cursor, image::ImageFormat::Jpeg).ok()?;
+
+    Some(cursor.into_inner())
 }
