@@ -1,7 +1,6 @@
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-from tqdm import trange
 
 cells = {
     "A1": [0, 0], "A2": [0, 1], "A3": [0, 2], "A4": [0, 3], "A5": [0, 4], "A6": [0, 5], "A7": [0, 6], "A8": [0, 7],
@@ -14,26 +13,27 @@ cells = {
     "H1": [7, 0], "H2": [7, 1], "H3": [7, 2], "H4": [7, 3], "H5": [7, 4], "H6": [7, 5], "H7": [7, 6], "H8": [7, 7]
 }
 
-IMAGE_GROWTH_FACTOR = 0.1
-IMAGE_SIZE = 128
 
-# TODO: study and cleanup this function
+def getBoardImgSize(growthFactor, imageSize):
+    boardSize = np.array([8, 8])
+    boardImgSize = np.ceil((boardSize * imageSize)/(1.0 + growthFactor * (boardSize - 1.0))).astype(int)
+    return tuple(boardImgSize)
+
+
 def getSegmentsIntersection(a1, a2, b1, b2):
     a = a2 - a1
     b = b2 - b1
     o = a1 - b1
     aLenSq = np.dot(a, a)
     aDotB = np.dot(a, b)
-    denom = (aLenSq * np.dot(b, b)) - aDotB**2.0
+    denom = (aLenSq * np.dot(b, b)) - aDotB ** 2.0
 
     if denom == 0.0:
-        # The segment are parallel, no unique intersection exists
         return None
 
     u = ((aLenSq * np.dot(b, o)) - (aDotB * np.dot(a, o))) / denom
 
     if u < 0.0 or u > 1.0:
-        # The potential intersection point is not situated on the segment, aborting
         return None
 
     t = np.dot(a, u * b - o) / aLenSq
@@ -42,17 +42,16 @@ def getSegmentsIntersection(a1, a2, b1, b2):
 
     return aPoint if (np.linalg.norm(np.round(aPoint - bPoint), 5) == 0.0) else None
 
-# TODO: study and cleanup this function
-boardSize = np.array([8, 8])
-boardImgSize = np.ceil((boardSize * IMAGE_SIZE)/(1.0 + IMAGE_GROWTH_FACTOR * (boardSize - 1.0))).astype(int)
-boardImgSize = tuple(boardImgSize)
-def unprojectCropFromRelativeCoords(img_, cx, outputShape, growthFactor = 0.0):
-    boardCornersRel = np.array(cx)
-    boardCornersRel = np.column_stack((boardCornersRel[:,0], 1.0 - boardCornersRel[:,1]))
 
-    O = getSegmentsIntersection(boardCornersRel[0], boardCornersRel[3], boardCornersRel[1], boardCornersRel[2])
+def unprojectCropFromRelativeCoords(img_, cx, outputShape, growthFactor=0.0):
+    boardCornersRel = np.array(cx)
+    boardCornersRel = np.column_stack((boardCornersRel[:, 0], 1.0 - boardCornersRel[:, 1]))
+
+    intersection = getSegmentsIntersection(
+        boardCornersRel[0], boardCornersRel[3], boardCornersRel[1], boardCornersRel[2])
+
     for i in range(4):
-        boardCornersRel[i] = growthFactor * (boardCornersRel[i] - O) + boardCornersRel[i]
+        boardCornersRel[i] = growthFactor * (boardCornersRel[i] - intersection) + boardCornersRel[i]
 
     cornersAbs = np.round(boardCornersRel * (np.array(img_.shape)[0:2] - np.array([1.0, 1.0])))
 
@@ -69,35 +68,40 @@ def unprojectCropFromRelativeCoords(img_, cx, outputShape, growthFactor = 0.0):
 
     return cv2.warpPerspective(img_, M, outputShape, flags=cv2.INTER_LINEAR)
 
-def crop_board(image, corners, flag=False):
+
+def crop_board(image, corners, growthFactor=0.1, imageSize=128, flag=False):
     if flag:
         for c in corners:
             c[1] = 1 - c[1]
 
-    return unprojectCropFromRelativeCoords(image, corners, boardImgSize, IMAGE_GROWTH_FACTOR)
+    boardImgSize = getBoardImgSize(growthFactor, imageSize)
 
-# TODO: study and cleanup these functions
-marginsSize = np.array([1.0, 1.0]) * IMAGE_SIZE * IMAGE_GROWTH_FACTOR * 0.5
-cellSize = (IMAGE_SIZE - 2.0 * marginsSize) / boardSize
-cellRelSize = (1.0 - IMAGE_GROWTH_FACTOR) / boardSize
-def getCellCenterRel(cellX, cellY):
-    return np.zeros(2) + (IMAGE_GROWTH_FACTOR * 0.5) + np.array([0.5 + cellX, 0.5 + cellY]) * cellRelSize
+    return unprojectCropFromRelativeCoords(image, corners, boardImgSize, growthFactor)
 
-def getCellBoundingBoxRel(cellX, cellY):
-    cellCenter = getCellCenterRel(cellX, cellY)
-    newExtents = np.dot(np.array([-0.5, 0.5]).reshape((2,1)), (cellRelSize + IMAGE_GROWTH_FACTOR).reshape((1,2)))
+
+def getCellCenterRel(cellX, cellY, cellRelSize, growthFactor=0.1):
+    return np.zeros(2) + (growthFactor * 0.5) + np.array([0.5 + cellX, 0.5 + cellY]) * cellRelSize
+
+
+def getCellBoundingBoxRel(cellX, cellY, cellRelSize, growthFactor=0.1):
+    cellCenter = getCellCenterRel(cellX, cellY, cellRelSize, growthFactor=growthFactor)
+    newExtents = np.dot(np.array([-0.5, 0.5]).reshape((2, 1)), (cellRelSize + growthFactor).reshape((1, 2)))
     return cellCenter + newExtents
 
-def crop_pieces(image, pieces=None):
+
+def crop_pieces(image, pieces=None, growthFactor=0.1, imageSize=128):
     images = []
     labels = []
 
+    boardImgSize = getBoardImgSize(growthFactor, imageSize)
+    cellRelSize = (1.0 - growthFactor) / np.array([8, 8])
+
     for cell in cells:
         cell_coords = cells[cell]
-        cellBoundsRel = getCellBoundingBoxRel(cell_coords[0], cell_coords[1])
+        cellBoundsRel = getCellBoundingBoxRel(cell_coords[0], cell_coords[1], cellRelSize, growthFactor=growthFactor)
         cellBoundsAbs = np.round(np.multiply(cellBoundsRel.T, boardImgSize)).astype(int)
 
-        piece_image = image[cellBoundsAbs[0,0]:cellBoundsAbs[0,1],cellBoundsAbs[1,0]:cellBoundsAbs[1,1]]
+        piece_image = image[cellBoundsAbs[0, 0]:cellBoundsAbs[0, 1], cellBoundsAbs[1, 0]:cellBoundsAbs[1, 1]]
 
         images.append(piece_image)
         if pieces:
@@ -123,7 +127,7 @@ if __name__ == "__main__":
         pieces = annotations['config']
 
         board_image = crop_board(image, corners)
-        piece_images, cell_labels = crop_pieces(board_image, pieces)
+        piece_images, cell_labels = crop_pieces(board_image, pieces=pieces)
 
         print(len(piece_images))
         print(len(cell_labels))

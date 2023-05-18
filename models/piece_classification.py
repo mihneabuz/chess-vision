@@ -15,6 +15,9 @@ from utils.process import crop_board, crop_pieces
 from utils.utils import classes_dict, image_from_bytes, bytes_as_file, deserialize_array,\
     num_classes, get_device, serialize_values, train_loop, validation_metrics, summary, dataset
 
+size = 144
+growthFactor = 0.08
+
 
 def augment(image, label):
     size = image.shape[1]
@@ -81,8 +84,8 @@ def load_board_images(max=-1):
 
 def load_piece_images(max=-1):
     for image, annotations in load_data(max=max):
-        board_image = crop_board(image, annotations['corners'])
-        pieces, labels = crop_pieces(board_image, annotations['config'])
+        board_image = crop_board(image, annotations['corners'], growthFactor=growthFactor, imageSize=size)
+        pieces, labels = crop_pieces(board_image, annotations['config'], growthFactor=growthFactor, imageSize=size)
         yield from zip(pieces, labels)
 
 
@@ -103,7 +106,7 @@ def load_datasets(limit=-1, balance=True):
 
     if balance:
         avg_count = sum([counts[label] for label in classes_dict if label != 'empty']) // 10
-        drop_chance = avg_count * 150 // counts['empty']
+        drop_chance = avg_count * 300 // counts['empty']
         dropped = 0
 
         balanced_pieces_images = []
@@ -159,7 +162,7 @@ def train(epochs, lr=0.0001, batch_size=64, limit=-1, load_dict=False):
 
     model = create_model(load_dict=load_dict, pretrained=not load_dict)
     model.to(device)
-    summary(model, (3, 128, 128))
+    summary(model, (3, size, size))
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = torch.nn.CrossEntropyLoss()
@@ -205,8 +208,8 @@ class Service(service.Service):
         corners = np.array_split(deserialize_array(input[1]), 4)
 
         try:
-            board = crop_board(image, corners, flag=True)
-            pieces, _ = crop_pieces(board)
+            board = crop_board(image, corners, flag=True, growthFactor=growthFactor, imageSize=size)
+            pieces, _ = crop_pieces(board, pieces=None, growthFactor=growthFactor, imageSize=size)
             return torch.stack([jit_transform(tensor_transform(piece)) for piece in pieces])
         except Exception as e:
             print('bad corners', e, corners)
@@ -221,4 +224,4 @@ class Service(service.Service):
 
 
 if __name__ == "__main__":
-    train(16, batch_size=32, limit=-1, load_dict=False)
+    train(12, batch_size=32, limit=-1, load_dict=False)
