@@ -16,7 +16,7 @@ from utils.utils import get_device, train_loop, dataset, bytes_as_file, image_fr
 
 import u2net.model as u2net
 
-size = 224
+size = 240
 
 
 def augment(image, mask):
@@ -40,6 +40,14 @@ def augment(image, mask):
 
     if random.random() > 0.9:
         image = TF.gaussian_blur(image, 3)
+
+    if random.random() > 0.4:
+        image = TF.hflip(image)
+        mask = TF.hflip(mask)
+
+    if random.random() > 0.2:
+        image = TF.vflip(image)
+        mask = TF.vflip(mask)
 
     return image, mask
 
@@ -73,7 +81,7 @@ def loss_func(preds, real):
 
     scale = size * size
 
-    return (l1 * 2 + l2 + l3 + l4 + l5 + l6 + l7) / scale
+    return (l1 + l2 + l3 + l4 + l5 + l6 + l7) / scale
 
 
 def load_datasets(limit=-1):
@@ -93,7 +101,7 @@ def load_datasets(limit=-1):
     print(f'image size: {images[0].shape}')
 
     count = len(images)
-    train_size = int(count * 0.8)
+    train_size = int(count * 0.9)
     valid_size = count - train_size
 
     train_im, test_im, train_mk, test_mk = train_test_split(images, masks, test_size=valid_size)
@@ -125,7 +133,7 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
     model.to(device)
     summary(model, (3, size, size))
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = loss_func
 
     losses = []
@@ -162,7 +170,7 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
 
 
 class Service(service.Service):
-    def __init__(self, maskSize=128, quality=0.3):
+    def __init__(self, maskSize=100, quality=0.3):
         self.name = 'board_segmentation'
         self.model = create_model(load_dict=False)
         self.model.eval()
@@ -187,4 +195,4 @@ class Service(service.Service):
 
 
 if __name__ == '__main__':
-    train(0, lr=0.0003, batch_size=10, limit=100, load_dict=True)
+    train(12, lr=0.0003, batch_size=8, limit=-1, load_dict=False)

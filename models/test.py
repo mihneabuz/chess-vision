@@ -10,7 +10,7 @@ from board_detection import Service as BoardDetection
 from piece_classification import Service as PieceClassification
 from board_segmentation import Service as BoardSegmentation
 from utils.process import crop_board, crop_pieces, translate_pieces
-from utils.utils import deserialize_array, serialize_array, deserialize_values, image_from_bytes, image_to_bytes, classes_dict
+from utils.utils import deserialize_array, deserialize_values, image_from_bytes, image_to_bytes, classes_dict
 
 
 def add_corners(image, corners):
@@ -73,6 +73,9 @@ def visualize_single(models):
     plt.show()
 
     seg_corners = board_segmentation.process([input1, input1])
+    if len(seg_corners[0]) == 0:
+        return
+
     plt.imshow(add_corners(image, stack_corners(deserialize_array(seg_corners[0]))))
     plt.show()
 
@@ -127,18 +130,56 @@ def evaluate(models):
 
     found = [deserialize_values(data, 64, np.uint8) for data in result2 if len(data) > 0]
     for i in range(len(images)):
-        print(list(reversed(found[i].tolist())))
-        print(images[i][1])
-        count = len([0 for j in range(64) if images[i][1][j] == found[i][63 - j]])
+        real = images[i][1]
+        pred = list(reversed(found[i].tolist()))
+        print(pred)
+        print(real)
+
+        count = len(list(filter(lambda a: a[0] == a[1], zip(real, pred))))
+
+        counts = [0 for _ in range(13)]
+        for x in pred:
+            counts[x] += 1
+
+        for x in real:
+            counts[x] -= 1
+
         print('accuracy: ', count / 64)
-        print('-------------------')
+        print('piece count diff: ', counts)
+        print('--------------------------------------------------------------')
+
+
+def segmentation():
+    file = argv[2]
+
+    image = cv2.imread(file)
+    print(image.shape)
+    size = image.shape[0]
+
+    plt.imshow(image)
+    plt.show()
+
+    import board_segmentation as seg
+    model = seg.create_model(load_dict=True)
+    model.eval()
+
+    input = seg.jit_transform(seg.tensor_transform(image))
+    mask = model(input[None, :, :, :])[0].detach().numpy()[0, 0, :, :]
+    plt.imshow(mask)
+    plt.show()
+
+    mask = cv2.resize(mask, (size, size))
+    image = image / 255
+    image[mask < 0.9] *= np.array([0.2, 0.1, 0.0])
+    plt.imshow(image)
+    plt.show()
 
 
 if __name__ == '__main__':
     mode = argv[1]
 
     board_detection = BoardDetection()
-    board_segmentation = BoardSegmentation(maskSize=128, quality=0.3)
+    board_segmentation = BoardSegmentation(maskSize=100, quality=0.3)
     piece_classification = PieceClassification()
 
     with open('./board_detection_weights', 'rb') as w:
@@ -157,3 +198,6 @@ if __name__ == '__main__':
 
     if mode == "eval":
         evaluate(models)
+
+    if mode == "segmentation":
+        segmentation()
