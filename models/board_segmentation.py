@@ -62,7 +62,7 @@ def jit_transform(x):
 
 
 def create_model(load_dict=False):
-    model = u2net.U2NET()
+    model = u2net.U2NETP()
     if load_dict:
         model.load_state_dict(torch.load('./board_segmentation_weights'))
     return model
@@ -170,7 +170,7 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
 
 
 class Service(service.Service):
-    def __init__(self, maskSize=100, quality=0.3):
+    def __init__(self, maskSize=120, quality=0.3):
         self.name = 'board_segmentation'
         self.model = create_model(load_dict=False)
         self.model.eval()
@@ -195,4 +195,4 @@ class Service(service.Service):
 
 
 if __name__ == '__main__':
-    train(12, lr=0.0003, batch_size=8, limit=-1, load_dict=False)
+    train(30, lr=0.001, batch_size=12, limit=-1, load_dict=False)

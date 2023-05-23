@@ -5,6 +5,7 @@ from random import sample
 from tqdm import tqdm
 
 DATA = 'boards/data'
+EXTRA = 'extra'
 
 
 def download_data():
@@ -19,14 +20,15 @@ def load_data(max=-1):
     if not path.isdir(DATA):
         download_data()
 
-    files = [file[:-4] for file in listdir(DATA) if file.endswith('.jpg')]
+    files = [DATA + '/' + file[:-4] for file in listdir(DATA) if file.endswith('.jpg')] \
+        + [EXTRA + '/' + file[:-4] for file in listdir(EXTRA) if file.endswith('.jpg')] * 3
 
     if (max > 0):
         files = sample(files, max)
 
     for file in tqdm(files, desc='loading images'):
-        image = cv2.imread(DATA + '/' + file + '.jpg')
-        annotations = json.load(open(DATA + '/' + file + '.json'))
+        image = cv2.imread(file + '.jpg')
+        annotations = json.load(open(file + '.json'))
         yield image, annotations
 
 

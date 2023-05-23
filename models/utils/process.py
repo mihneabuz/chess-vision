@@ -104,7 +104,7 @@ def crop_pieces(image, pieces=None, growthFactor=0.1, imageSize=128):
         piece_image = image[cellBoundsAbs[0, 0]:cellBoundsAbs[0, 1], cellBoundsAbs[1, 0]:cellBoundsAbs[1, 1]]
 
         images.append(piece_image)
-        if pieces:
+        if pieces is not None:
             labels.append(pieces.get(cell, 'empty'))
 
     image = None
@@ -122,7 +122,7 @@ def translate_pieces(pieces):
 if __name__ == "__main__":
     from load_data import load_data
 
-    for image, annotations in load_data(1):
+    for image, annotations in load_data(-1):
         corners = annotations['corners']
         pieces = annotations['config']
 
@@ -135,8 +135,9 @@ if __name__ == "__main__":
         plt.imshow(board_image)
         plt.show()
 
-        for i in range(len(piece_images)):
+        for i in range(min(len(piece_images), 66)):
             print(cell_labels[i])
+            plt.title(cell_labels[i])
             plt.imshow(piece_images[i])
             plt.show()
-            break
+            input()

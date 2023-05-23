@@ -224,4 +224,4 @@ class Service(service.Service):
 
 
 if __name__ == "__main__":
-    train(12, batch_size=32, limit=-1, load_dict=False)
+    train(16, batch_size=32, limit=-1, load_dict=False)

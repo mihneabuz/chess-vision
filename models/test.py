@@ -179,7 +179,7 @@ if __name__ == '__main__':
     mode = argv[1]
 
     board_detection = BoardDetection()
-    board_segmentation = BoardSegmentation(maskSize=100, quality=0.3)
+    board_segmentation = BoardSegmentation(maskSize=120, quality=0.3)
     piece_classification = PieceClassification()
 
     with open('./board_detection_weights', 'rb') as w:
