@@ -13,6 +13,7 @@ type StageResult = std::result::Result<Message, ErrorMessage>;
 async fn main() {
     let (consume_sender, mut consume_receiver) = tokio::sync::mpsc::channel::<(Message, Bytes)>(20);
     let (publish_sender, publish_receiver) = tokio::sync::mpsc::channel::<StageResult>(20);
+    let (wrapper_done, wrapper_ready) = tokio::sync::oneshot::channel::<()>();
 
     let worker = tokio::task::spawn_blocking(move || {
         let service = wrapper::create(utils::service_type()).expect("could not load service");
@@ -20,6 +21,8 @@ async fn main() {
         let resource = service.resource().expect("could not get service resource");
         let data = fetch_file_sync(&resource).expect("could not fetch resource for service");
         service.configure(&data).expect("could not configure service");
+
+        wrapper_done.send(()).expect("could not send wrapper ready signal");
 
         let mut messages = Vec::new();
         loop {
@@ -53,6 +56,8 @@ async fn main() {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
     });
+
+    wrapper_ready.await.unwrap();
 
     let conn = &*Box::leak(Box::new(connect(&utils::amqp_addr()).await.unwrap()));
 

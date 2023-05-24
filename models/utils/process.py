@@ -1,6 +1,5 @@
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
 
 cells = {
     "A1": [0, 0], "A2": [0, 1], "A3": [0, 2], "A4": [0, 3], "A5": [0, 4], "A6": [0, 5], "A7": [0, 6], "A8": [0, 7],
@@ -120,6 +119,7 @@ def translate_pieces(pieces):
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
     from load_data import load_data
 
     for image, annotations in load_data(-1):

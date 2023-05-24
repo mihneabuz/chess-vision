@@ -3,10 +3,7 @@ import torch
 import torchvision.transforms.functional as TF
 from torchvision import models
 from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
 import cv2
-import matplotlib.pyplot as plt
-from tqdm import tqdm
 import random
 
 import service as service
@@ -66,6 +63,7 @@ def load_datasets(limit=-1):
     train_size = int(count * 0.8)
     valid_size = count - train_size
 
+    from sklearn.model_selection import train_test_split
     train_im, test_im, train_mk, test_mk = train_test_split(images, corners, test_size=valid_size)
     train = dataset(train_im, train_mk, augment=augment)
     test = dataset(test_im, test_mk)
@@ -98,6 +96,8 @@ def loss_func_max(predicted, real):
 
 
 def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
+    import matplotlib.pyplot as plt
+
     device = get_device()
 
     train_ds, valid_ds = load_datasets(limit=limit)
@@ -147,7 +147,7 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
 
     model.eval()
     valid_losses = []
-    for images, labels in tqdm(valid_dl, desc='validation'):
+    for images, labels in valid_dl:
         preds = model(jit_transform(images.to(device)))
         valid_losses.append(criterion(preds, labels.to(device)).item())
     print(f'validation loss: {sum(valid_losses)}')

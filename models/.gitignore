@@ -1,0 +1,5 @@
+boards
+extra/*.json
+extra/*.jpg
+test
+*_weights

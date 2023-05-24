@@ -2,10 +2,7 @@ import numpy as np
 import cv2
 from io import BytesIO
 import torch
-import torchsummary
 from torch.utils.data import Dataset
-from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
-from tqdm import tqdm
 
 classes_dict = {
     'empty':    0,
@@ -31,6 +28,7 @@ def get_device():
 
 
 def summary(model, input):
+    import torchsummary
     torchsummary.summary(model, input_size=input, device='cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -43,6 +41,8 @@ def id2(x, y):
 
 
 def train_loop(model, dataloader, optimizer, criterion, transform=id1):
+    from tqdm import tqdm
+
     device = get_device()
     model.train(True)
 
@@ -64,6 +64,9 @@ def train_loop(model, dataloader, optimizer, criterion, transform=id1):
 
 
 def validation_metrics(model, dataloader, transform, results):
+    from tqdm import tqdm
+    from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
+
     device = get_device()
     model.train(False)
 

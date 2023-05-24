@@ -3,10 +3,7 @@ import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as TF
 from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
 import cv2
-import matplotlib.pyplot as plt
-from tqdm import tqdm
 import random
 
 import service as service
@@ -41,11 +38,11 @@ def augment(image, mask):
     if random.random() > 0.9:
         image = TF.gaussian_blur(image, 3)
 
-    if random.random() > 0.4:
+    if random.random() > 0.5:
         image = TF.hflip(image)
         mask = TF.hflip(mask)
 
-    if random.random() > 0.2:
+    if random.random() > 0.5:
         image = TF.vflip(image)
         mask = TF.vflip(mask)
 
@@ -93,8 +90,7 @@ def load_datasets(limit=-1):
         mask = np.zeros((size, size), dtype=np.float32)
         corners = list(map(lambda x: [x[0], 1 - x[1]], annotations['corners']))
         corners = [corners[0], corners[1], corners[3], corners[2]]
-        cv2.fillPoly(
-            mask, pts=[(np.array(corners) * size).astype(np.int32)], color=1)
+        cv2.fillPoly(mask, pts=[(np.array(corners) * size).astype(np.int32)], color=1)
         masks.append(torch.tensor(mask))
 
     print(f'loaded {len(images)} images')
@@ -104,6 +100,7 @@ def load_datasets(limit=-1):
     train_size = int(count * 0.9)
     valid_size = count - train_size
 
+    from sklearn.model_selection import train_test_split
     train_im, test_im, train_mk, test_mk = train_test_split(images, masks, test_size=valid_size)
     train = dataset(train_im, train_mk, augment=augment)
     test = dataset(test_im, test_mk)
@@ -112,6 +109,8 @@ def load_datasets(limit=-1):
 
 
 def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
+    import matplotlib.pyplot as plt
+
     device = get_device()
 
     train_ds, valid_ds = load_datasets(limit=limit)
@@ -148,7 +147,7 @@ def train(epochs, lr=0.0001, batch_size=4, limit=-1, load_dict=False):
 
     model.eval()
     valid_losses = []
-    for images, labels in tqdm(valid_dl, desc='validation'):
+    for images, labels in valid_dl:
         preds = model(jit_transform(images.to(device)))
         valid_losses.append(criterion(preds, labels.to(device)).item())
     print(f'validation loss: {sum(valid_losses)}')
@@ -191,7 +190,8 @@ class Service(service.Service):
         return serialize_array(corners) if len(corners) else None
 
     def _process_batch(self, data):
-        return self.model(torch.stack(data))[0].detach().numpy()
+        with torch.no_grad():
+            return self.model(torch.stack(data))[0].detach().numpy()
 
 
 if __name__ == '__main__':

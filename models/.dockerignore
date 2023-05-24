@@ -1,6 +1,10 @@
 __pycache__
 boards
 test
+extra
 *_weights
 test.py
 requirements.txt
+weights.zip
+u2net/test_data
+u2net/figures

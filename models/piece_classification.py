@@ -1,21 +1,19 @@
 import numpy as np
 import torch
-import service as service
 from torchvision import models
 import torchvision.transforms as T
 import torchvision.transforms.functional as TF
 from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
-import matplotlib.pyplot as plt
 from collections import Counter
 import random
 
+import service as service
 from utils.load_data import load_data
 from utils.process import crop_board, crop_pieces
 from utils.utils import classes_dict, image_from_bytes, bytes_as_file, deserialize_array,\
     num_classes, get_device, serialize_values, train_loop, validation_metrics, summary, dataset
 
-size = 144
+size = 140
 growthFactor = 0.08
 
 
@@ -62,14 +60,16 @@ def set_grad(model, requires_grad):
 
 def create_model(load_dict=False, pretrained=False):
     if pretrained:
-        model = models.efficientnet_b2(weights=models.EfficientNet_B2_Weights.DEFAULT)
+        model = models.efficientnet_v2_s(weights=models.EfficientNet_V2_S_Weights.DEFAULT)
     else:
-        model = models.efficientnet_b2()
-        if load_dict:
-            model.load_state_dict(torch.load('./piece_classification_weights'))
+        model = models.efficientnet_v2_s()
 
     last_layer_size = model.classifier[-1].__getattribute__('out_features')
     model.classifier.append(torch.nn.Linear(in_features=last_layer_size, out_features=num_classes))
+
+    if load_dict:
+        model.load_state_dict(torch.load('./piece_classification_weights'))
+
     return model
 
 
@@ -99,6 +99,7 @@ def load_datasets(limit=-1, balance=True):
     image_size = pieces_images[0].shape
     print(f'image size: {image_size}')
 
+    import matplotlib.pyplot as plt
     counts = Counter(pieces_labels)
     print(f'label distribution: {", ".join([x[0] + ": " + str(x[1]) for x in counts.items()])}')
     plt.bar(counts.keys(), counts.values())
@@ -125,8 +126,7 @@ def load_datasets(limit=-1, balance=True):
         print(f'dropped {dropped} empty images')
 
         counts = Counter(balanced_pieces_labels)
-        print(
-            f'balanced label distribution: {", ".join([x[0] + ": " + str(x[1]) for x in counts.items()])}')
+        print(f'balanced label distribution: {", ".join([x[0] + ": " + str(x[1]) for x in counts.items()])}')
         plt.bar(counts.keys(), counts.values())
         plt.show()
 
@@ -136,9 +136,10 @@ def load_datasets(limit=-1, balance=True):
     pieces_classes = [classes_dict[label] for label in pieces_labels]
 
     size = len(pieces_images)
-    train_size = int(size * 0.8)
+    train_size = int(size * 0.9)
     valid_size = size - train_size
 
+    from sklearn.model_selection import train_test_split
     train_im, test_im, train_mk, test_mk = train_test_split(pieces_images, pieces_classes, test_size=valid_size)
     train = dataset(train_im, train_mk, augment=augment)
     test = dataset(test_im, test_mk)
@@ -147,6 +148,8 @@ def load_datasets(limit=-1, balance=True):
 
 
 def train(epochs, lr=0.0001, batch_size=64, limit=-1, load_dict=False):
+    import matplotlib.pyplot as plt
+
     device = get_device()
 
     train_ds, valid_ds = load_datasets(limit=limit)
@@ -198,10 +201,10 @@ class Service(service.Service):
     def __init__(self):
         self.name = 'piece_classification'
         self.model = create_model(pretrained=False)
+        self.model.eval()
 
     def load_model(self, data):
-        self.model.load_state_dict(torch.load(
-            bytes_as_file(data), map_location=torch.device('cpu')))
+        self.model.load_state_dict(torch.load(bytes_as_file(data), map_location=torch.device('cpu')))
 
     def _transform_in(self, input):
         image = image_from_bytes(input[0])
@@ -220,7 +223,8 @@ class Service(service.Service):
         return serialize_values(preds)
 
     def _process_batch(self, data):
-        return torch.argmax(self.model(torch.concat(data)), 1).split(64)
+        with torch.no_grad():
+            return torch.argmax(self.model(torch.concat(data)), 1).split(64)
 
 
 if __name__ == "__main__":

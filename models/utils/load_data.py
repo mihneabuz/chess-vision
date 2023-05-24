@@ -2,7 +2,6 @@ import cv2
 import json
 from os import listdir, path
 from random import sample
-from tqdm import tqdm
 
 DATA = 'boards/data'
 EXTRA = 'extra'
@@ -17,6 +16,8 @@ def download_data():
 
 
 def load_data(max=-1):
+    from tqdm import tqdm
+
     if not path.isdir(DATA):
         download_data()
 

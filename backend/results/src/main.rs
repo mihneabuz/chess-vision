@@ -1,5 +1,4 @@
 mod utils;
-
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -47,10 +46,8 @@ async fn main() {
     let results_ref = Arc::clone(&results);
     tokio::spawn(async move {
         consumer(conn, &utils::queue(), |message: Message| async {
-            results_ref
-                .lock()
-                .await
-                .insert(message.id, Ok(message.data.try_into().unwrap()));
+            let result = message.data.try_into().unwrap();
+            results_ref.lock().await.insert(message.id, Ok(result));
         })
         .await
         .expect("queue failed");

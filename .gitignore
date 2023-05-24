@@ -1,7 +1,4 @@
-data
 env
-boards
-models/*_weights
 .DS_Store
 **/__pycache__
 __pycache__

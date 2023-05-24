@@ -1,0 +1,151 @@
+version: "3.1"
+services:
+
+  web-frontend:
+    image: 127.0.0.1:5000/web
+    build:
+      context: ./web
+    restart: always
+    ports:
+      - 80:3000
+    environment:
+      FILE_SERVER: file-server
+      FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
+      MESSAGE_BROKER: rabbitmq
+      MESSAGE_QUEUE: stage1
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - services
+    links:
+      - file-server
+      - rabbitmq
+      - upload
+      - results
+      - engine
+
+  file-server:
+    image: mayth/simple-upload-server:latest
+    command: -token ${FILE_SERVER_TOKEN} -port 80 -upload_limit 400000000 /var/root
+    restart: always
+    volumes:
+      - file-storage:/var/root
+    networks:
+      - pipeline
+
+  weights-up:
+    image: curlimages/curl:latest
+    command: sh -c 'for file in /models/*_weights; do echo "uploading $$file" ; curl -Ffile=@$$file "http://file-server/upload?token=${FILE_SERVER_TOKEN}"; done'
+    environment:
+      FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
+    restart: on-failure
+    volumes:
+      - ./models:/models
+    networks:
+      - pipeline
+    links:
+      - file-server
+
+  rabbitmq:
+    image: rabbitmq:3
+    restart: always
+    volumes:
+      - rabbit-storage:/var/lib/rabbitmq/
+      - rabbit-logs:/var/log/rabbitmq
+    networks:
+      - pipeline
+
+  upload:
+    image: 127.0.0.1:5000/upload
+    build:
+      dockerfile: ./upload/Dockerfile
+      context: ./backend
+    restart: always
+    environment:
+      FILE_SERVER: file-server
+      FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
+      MESSAGE_BROKER: rabbitmq
+      QUEUE: stage1
+    networks:
+      - services
+      - pipeline
+    links:
+      - rabbitmq
+
+  board_segmentation:
+    image: 127.0.0.1:5000/board_segmentation
+    build:
+      dockerfile: ./stage/Dockerfile
+      context: ./backend
+    restart: always
+    environment:
+      SERVICE_TYPE: python
+      MODEL_NAME: board_segmentation
+      FILE_SERVER: file-server
+      FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
+      MESSAGE_BROKER: rabbitmq
+      CURRENT_QUEUE: stage1
+      NEXT_QUEUE: stage2
+      FAIL_QUEUE: fail
+    networks:
+      - pipeline
+    links:
+      - rabbitmq
+      - file-server
+
+  piece_classification:
+    image: 127.0.0.1:5000/piece_classification
+    build:
+      dockerfile: ./stage/Dockerfile
+      context: ./backend
+    restart: always
+    environment:
+      SERVICE_TYPE: python
+      MODEL_NAME: piece_classification
+      FILE_SERVER: file-server
+      FILE_SERVER_TOKEN: ${FILE_SERVER_TOKEN}
+      MESSAGE_BROKER: rabbitmq
+      CURRENT_QUEUE: stage2
+      NEXT_QUEUE: stage3
+      FAIL_QUEUE: fail
+    networks:
+      - pipeline
+    links:
+      - rabbitmq
+      - file-server
+
+  results:
+    image: 127.0.0.1:5000/results
+    build:
+      dockerfile: ./results/Dockerfile
+      context: ./backend
+    restart: always
+    environment:
+      MESSAGE_BROKER: rabbitmq
+      QUEUE: stage3
+      FAIL_QUEUE: fail
+    networks:
+      - pipeline
+      - services
+    links:
+      - rabbitmq
+
+  engine:
+    image: 127.0.0.1:5000/engine
+    build:
+      context: ./backend/engine
+    restart: always
+    networks:
+      - services
+    links:
+      - rabbitmq
+
+volumes:
+  file-storage:
+  rabbit-storage:
+  rabbit-logs:
+
+networks:
+  pipeline:
+  services:

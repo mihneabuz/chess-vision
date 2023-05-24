@@ -3,10 +3,10 @@ class Service:
         self.name = 'model'
         pass
 
-    def get_model_name(self):
+    def get_model_name(self) -> str:
         return self.name
 
-    def load_model(self, model):
+    def load_model(self, model: bytes):
         pass
 
     def _transform_in(self, input):
@@ -18,7 +18,7 @@ class Service:
     def _process_batch(self, data):
         return data
 
-    def process(self, inputs):
+    def process(self, inputs: [(bytes, bytes)]):
         if len(inputs) <= 20:
             transformed = [self._transform_in(input) for input in inputs]
             filtered = [input for input in transformed if input is not None]

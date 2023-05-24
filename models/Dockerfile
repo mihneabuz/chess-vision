@@ -1,7 +1,4 @@
-from python:3.9-bullseye as BASE
-
-RUN apt update
-RUN apt install -y libgl1
+from python:3.9-slim-buster as BASE
 
 WORKDIR /model
 
