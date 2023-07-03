@@ -1,4 +1,4 @@
-from python:3.9-slim-buster as BASE
+from python:3.9-slim-bullseye as BASE
 
 WORKDIR /model
 

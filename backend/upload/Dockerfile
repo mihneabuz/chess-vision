@@ -1,4 +1,4 @@
-FROM rust:latest AS deps
+FROM rust:1.70 AS deps
 
 COPY ./shared ./shared
 

@@ -1,4 +1,4 @@
-FROM rustlang/rust:nightly AS builder
+FROM rust:1.70 AS builder
 
 RUN apt update
 RUN apt install -y libpython3.9-dev

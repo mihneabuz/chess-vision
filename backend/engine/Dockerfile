@@ -1,4 +1,4 @@
-FROM rust:latest AS stockfish-builder
+FROM rust:1.70 AS stockfish-builder
 
 RUN git clone https://github.com/official-stockfish/Stockfish.git
 WORKDIR Stockfish
